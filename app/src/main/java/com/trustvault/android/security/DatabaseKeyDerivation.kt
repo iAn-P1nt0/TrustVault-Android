@@ -1,0 +1,175 @@
+package com.trustvault.android.security
+
+import android.content.Context
+import android.provider.Settings
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Derives secure database encryption keys from master password.
+ * Uses PBKDF2-HMAC-SHA256 with device-specific salt for additional security.
+ *
+ * Security Features:
+ * - Master password + device binding (ANDROID_ID)
+ * - 100,000 iterations (OWASP recommended minimum)
+ * - 256-bit output key length
+ * - Additional random salt stored securely
+ * - Protection against rainbow table attacks
+ */
+@Singleton
+class DatabaseKeyDerivation @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val keystoreManager: AndroidKeystoreManager
+) {
+
+    /**
+     * Derives a 256-bit database encryption key from the master password.
+     * This key is used to encrypt the SQLCipher database.
+     *
+     * The derivation uses:
+     * 1. Master password (user input)
+     * 2. Device-specific identifier (ANDROID_ID)
+     * 3. Random salt (generated once, stored encrypted)
+     * 4. PBKDF2 with 100,000 iterations
+     *
+     * @param masterPassword The user's master password
+     * @return 256-bit key suitable for AES-256 encryption
+     */
+    fun deriveKey(masterPassword: String): ByteArray {
+        require(masterPassword.isNotBlank()) { "Master password cannot be blank" }
+
+        // Get device-specific identifier
+        val deviceId = getDeviceIdentifier()
+
+        // Get or create random salt (stored encrypted in Android Keystore)
+        val salt = getOrCreateSalt()
+
+        // Combine device ID and salt for additional entropy
+        val finalSalt = (deviceId + salt.contentToString()).toByteArray()
+
+        // Derive key using PBKDF2
+        return deriveKeyWithPBKDF2(
+            password = masterPassword,
+            salt = finalSalt,
+            iterations = PBKDF2_ITERATIONS,
+            keyLength = KEY_LENGTH_BITS
+        )
+    }
+
+    /**
+     * Derives a key using PBKDF2-HMAC-SHA256.
+     * This is a computationally expensive operation (intentional security feature).
+     */
+    private fun deriveKeyWithPBKDF2(
+        password: String,
+        salt: ByteArray,
+        iterations: Int,
+        keyLength: Int
+    ): ByteArray {
+        val spec = PBEKeySpec(
+            password.toCharArray(),
+            salt,
+            iterations,
+            keyLength
+        )
+
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val key = factory.generateSecret(spec).encoded
+
+        // Clear sensitive data from memory
+        spec.clearPassword()
+
+        return key
+    }
+
+    /**
+     * Gets a stable device identifier.
+     * Uses ANDROID_ID which is unique per app per device.
+     */
+    private fun getDeviceIdentifier(): String {
+        return Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID
+        ) ?: "default_device_id"
+    }
+
+    /**
+     * Gets or creates a random salt for key derivation.
+     * The salt is generated once and stored encrypted using Android Keystore.
+     * This prevents the same master password from generating the same key across devices.
+     */
+    private fun getOrCreateSalt(): ByteArray {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val encryptedSaltBase64 = prefs.getString(KEY_SALT, null)
+
+        return if (encryptedSaltBase64 != null) {
+            // Decrypt existing salt
+            val encryptedSalt = android.util.Base64.decode(
+                encryptedSaltBase64,
+                android.util.Base64.NO_WRAP
+            )
+            keystoreManager.decrypt(SALT_KEY_ALIAS, encryptedSalt)
+        } else {
+            // Generate new random salt
+            val salt = ByteArray(SALT_LENGTH)
+            SecureRandom().nextBytes(salt)
+
+            // Encrypt and store salt
+            val encryptedSalt = keystoreManager.encrypt(SALT_KEY_ALIAS, salt)
+            val encryptedSaltBase64 = android.util.Base64.encodeToString(
+                encryptedSalt,
+                android.util.Base64.NO_WRAP
+            )
+
+            prefs.edit()
+                .putString(KEY_SALT, encryptedSaltBase64)
+                .apply()
+
+            salt
+        }
+    }
+
+    /**
+     * Clears all stored key derivation data.
+     * Should be called when resetting the app or changing master password.
+     */
+    fun clearKeyDerivationData() {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+        keystoreManager.deleteKey(SALT_KEY_ALIAS)
+    }
+
+    /**
+     * Validates that a master password can derive a valid key.
+     * Used for testing and validation purposes.
+     */
+    fun validateMasterPassword(masterPassword: String): Boolean {
+        return try {
+            val key = deriveKey(masterPassword)
+            key.size == KEY_LENGTH_BITS / 8
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    companion object {
+        // OWASP recommends minimum 100,000 iterations for PBKDF2
+        // Consider increasing to 310,000+ for even better security
+        private const val PBKDF2_ITERATIONS = 100_000
+
+        // 256-bit key for AES-256 encryption
+        private const val KEY_LENGTH_BITS = 256
+
+        // Salt length (128 bits recommended minimum)
+        private const val SALT_LENGTH = 16
+
+        // Storage keys
+        private const val PREFS_NAME = "trustvault_key_derivation"
+        private const val KEY_SALT = "db_key_salt"
+        private const val SALT_KEY_ALIAS = "trustvault_salt_encryption_key"
+    }
+}
