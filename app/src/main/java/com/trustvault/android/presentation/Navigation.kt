@@ -16,4 +16,5 @@ sealed class Screen(val route: String) {
             else "add_edit_credential"
     }
     object PasswordGenerator : Screen("password_generator")
+    object OcrCapture : Screen("ocr_capture")
 }

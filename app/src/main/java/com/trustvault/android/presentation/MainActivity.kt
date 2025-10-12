@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
@@ -20,7 +21,9 @@ import com.trustvault.android.presentation.ui.screens.auth.UnlockScreen
 import com.trustvault.android.presentation.ui.screens.credentials.AddEditCredentialScreen
 import com.trustvault.android.presentation.ui.screens.credentials.CredentialListScreen
 import com.trustvault.android.presentation.ui.screens.generator.PasswordGeneratorScreen
+import com.trustvault.android.presentation.ui.screens.ocr.OcrCaptureScreen
 import com.trustvault.android.presentation.ui.theme.TrustVaultTheme
+import com.trustvault.android.presentation.viewmodel.AddEditCredentialViewModel
 import com.trustvault.android.presentation.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -92,6 +95,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToGenerator = {
                                     navController.navigate(Screen.PasswordGenerator.route)
+                                },
+                                onNavigateToOcrCapture = {
+                                    navController.navigate(Screen.OcrCapture.route)
                                 }
                             )
                         }
@@ -99,6 +105,20 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.PasswordGenerator.route) {
                             PasswordGeneratorScreen(
                                 onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable(Screen.OcrCapture.route) {
+                            val parentEntry = remember(it) {
+                                navController.getBackStackEntry(Screen.AddEditCredential.route)
+                            }
+                            val parentViewModel: AddEditCredentialViewModel = hiltViewModel(parentEntry)
+
+                            OcrCaptureScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onCredentialsExtracted = { ocrResult ->
+                                    parentViewModel.populateFromOcrResult(ocrResult)
+                                }
                             )
                         }
                     }

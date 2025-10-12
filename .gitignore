@@ -36,3 +36,81 @@ google-services.json
 
 # Room schema exports
 app/schemas/
+
+# ------------------------- Added by Copilot: enhanced ignore set -------------------------
+# macOS / Windows metadata
+.DS_Store
+Thumbs.db
+
+# Additional IntelliJ/Android Studio cache files (workspace/caches are ephemeral)
+.idea/*workspace.xml
+.idea/*tasks.xml
+/.idea/caches/
+/.idea/libraries/
+/.idea/gradle.xml
+/.idea/modules.xml
+.idea/dictionaries/
+.idea/assetWizardSettings.xml
+out/
+
+# VS Code
+.vscode/
+
+# Gradle and tooling caches
+.gradle-test-kit/
+**/build/
+
+# Kotlin/Gradle
+.kotlin/
+
+# Local env/config and secrets (keep out of VCS)
+.env
+.env.*
+*.env
+*.env.*
+key.properties
+keystore.properties
+secret.properties
+*.properties.local
+
+# Firebase/Crashlytics generated files
+app/fabric.properties
+app/crashlytics.properties
+app/crashlytics-build.properties
+firebase-debug.log
+
+# AI assistant / local tooling
+.claude/
+
+# Coverage and reports
+*.ec
+*.exec
+jacoco.exec
+coverage/
+coverage-final.json
+
+# Node/Yarn (harmless if unused, avoids accidental JS tooling noise)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Misc temp and patch files
+*.tmp
+*.temp
+*.trace
+*.orig
+*.rej
+*~
+
+# Android artifacts (additional)
+*.apks
+*.apksigner
+*.dex
+*.class
+
+# CMake/NDK extra
+.cmake/
+cmake-build-*/
+# ----------------------- End of Copilot additions -----------------------

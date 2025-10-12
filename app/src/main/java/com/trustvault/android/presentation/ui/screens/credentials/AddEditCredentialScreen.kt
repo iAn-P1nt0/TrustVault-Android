@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trustvault.android.BuildConfig
 import com.trustvault.android.domain.model.CredentialCategory
 import com.trustvault.android.presentation.viewmodel.AddEditCredentialViewModel
 
@@ -27,6 +28,7 @@ import com.trustvault.android.presentation.viewmodel.AddEditCredentialViewModel
 fun AddEditCredentialScreen(
     onNavigateBack: () -> Unit,
     onNavigateToGenerator: () -> Unit,
+    onNavigateToOcrCapture: () -> Unit = {},
     viewModel: AddEditCredentialViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -62,6 +64,23 @@ fun AddEditCredentialScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // OCR Scan button (conditional on feature flag)
+            if (BuildConfig.ENABLE_OCR_FEATURE && !uiState.isEditing) {
+                OutlinedButton(
+                    onClick = onNavigateToOcrCapture,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CameraAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Scan from Browser")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             OutlinedTextField(
                 value = uiState.username,

@@ -34,9 +34,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // OCR feature disabled by default in release
+            buildConfigField("boolean", "ENABLE_OCR_FEATURE", "false")
         }
         debug {
             isMinifyEnabled = false
+            // OCR feature enabled in debug builds
+            buildConfigField("boolean", "ENABLE_OCR_FEATURE", "true")
         }
     }
     
@@ -101,12 +105,29 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // ML Kit Text Recognition (Bundled Model for OCR)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+
+    // CameraX for OCR capture
+    val cameraxVersion = "1.3.1"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Accompanist Permissions (for Compose permission handling)
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))

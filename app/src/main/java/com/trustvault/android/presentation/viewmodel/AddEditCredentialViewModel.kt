@@ -7,6 +7,7 @@ import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.domain.model.CredentialCategory
 import com.trustvault.android.domain.repository.CredentialRepository
 import com.trustvault.android.domain.usecase.SaveCredentialUseCase
+import com.trustvault.android.security.ocr.OcrResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +71,34 @@ class AddEditCredentialViewModel @Inject constructor(
 
     fun onCategoryChange(category: CredentialCategory) {
         _uiState.value = _uiState.value.copy(category = category)
+    }
+
+    /**
+     * Populate fields from OCR result.
+     *
+     * SECURITY CONTROL: Clears OcrResult after population to minimize
+     * plaintext credential lifetime in memory.
+     *
+     * @param ocrResult Extracted credentials from OCR processing
+     */
+    fun populateFromOcrResult(ocrResult: OcrResult) {
+        try {
+            // Convert CharArray to String for UI state
+            val username = ocrResult.getUsername()?.let { String(it) } ?: _uiState.value.username
+            val password = ocrResult.getPassword()?.let { String(it) } ?: _uiState.value.password
+            val website = ocrResult.getWebsite()?.let { String(it) } ?: _uiState.value.website
+
+            // Update UI state with extracted data
+            _uiState.value = _uiState.value.copy(
+                username = username,
+                password = password,
+                website = website
+            )
+
+        } finally {
+            // SECURITY CONTROL: Clear OCR result immediately after population
+            ocrResult.clear()
+        }
     }
 
     fun saveCredential(onSuccess: () -> Unit) {
