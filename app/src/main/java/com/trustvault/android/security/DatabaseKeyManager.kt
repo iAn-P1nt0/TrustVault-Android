@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.trustvault.android.data.local.database.TrustVaultDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
-import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,8 +46,7 @@ class DatabaseKeyManager @Inject constructor(
         val key = keyDerivation.deriveKey(masterPassword)
         currentKey = key
 
-        // Create SQLCipher support factory with derived key
-        // key is already a ByteArray, so use it directly
+        // Create SQLCipher support factory with derived key (ByteArray)
         val factory = SupportFactory(key)
 
         // Build and return Room database with encryption
@@ -62,7 +60,6 @@ class DatabaseKeyManager @Inject constructor(
             .build()
 
         currentDatabase = database
-
 
         return database
     }
@@ -111,11 +108,12 @@ class DatabaseKeyManager @Inject constructor(
     fun changeMasterPassword(oldPassword: String, newPassword: String): TrustVaultDatabase {
         // Verify old password is correct
         val oldKey = keyDerivation.deriveKey(oldPassword)
-        if (!currentKey.contentEquals(oldKey)) {
-            oldKey.fill(0)
+        val matches = currentKey?.contentEquals(oldKey) == true
+        // Clear oldKey from memory
+        oldKey.fill(0)
+        if (!matches) {
             throw SecurityException("Old password is incorrect")
         }
-        oldKey.fill(0)
 
         // Lock current database
         lockDatabase()
@@ -132,7 +130,6 @@ class DatabaseKeyManager @Inject constructor(
         return try {
             val key = keyDerivation.deriveKey(masterPassword)
 
-            // Attempt to open database with derived key
             val factory = SupportFactory(key)
 
             val testDb = Room.databaseBuilder(
@@ -147,7 +144,7 @@ class DatabaseKeyManager @Inject constructor(
             testDb.openHelper.readableDatabase
             testDb.close()
 
-            // Clean up
+            // Clean up temporary key material
             key.fill(0)
 
             true

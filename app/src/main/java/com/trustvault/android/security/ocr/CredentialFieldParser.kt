@@ -40,9 +40,14 @@ class CredentialFieldParser @Inject constructor() {
             RegexOption.IGNORE_CASE
         )
 
+        // Domain-only regex (no scheme), e.g., example.com/login
+        private val DOMAIN_ONLY_REGEX = Regex(
+            """\b([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(/[^\s]*)?\b"""
+        )
+
         // Username context keywords (case-insensitive)
         private val USERNAME_KEYWORDS = listOf(
-            "username", "user", "email", "login", "account", "id"
+            "username", "user", "user name", "email", "e-mail", "login", "account", "id", "user id", "userid"
         )
 
         // Password context keywords (case-insensitive)
@@ -55,7 +60,7 @@ class CredentialFieldParser @Inject constructor() {
             "site", "website", "url", "address", "domain"
         )
 
-        // Common OCR errors and corrections
+        // Common OCR errors and corrections (kept for future use)
         private val OCR_CORRECTIONS = mapOf(
             "l" to "1",     // lowercase L to 1 (in passwords)
             "O" to "0",     // uppercase O to 0 (in passwords)
@@ -135,7 +140,7 @@ class CredentialFieldParser @Inject constructor() {
      * @return Username as CharArray, or null if not found
      */
     private fun extractUsername(lines: List<String>): CharArray? {
-        // Strategy 1: Email pattern (highest confidence)
+        // 1) Email pattern (highest confidence)
         for (line in lines) {
             EMAIL_REGEX.find(line)?.let { match ->
                 val email = match.value
@@ -146,17 +151,16 @@ class CredentialFieldParser @Inject constructor() {
             }
         }
 
-        // Strategy 2: Context-based extraction
+        // 2) Context-based extraction
         for (i in lines.indices) {
-            val line = lines[i].lowercase()
+            val lineLower = lines[i].lowercase()
 
-            // Check if line contains username keyword
             val hasKeyword = USERNAME_KEYWORDS.any { keyword ->
-                line.contains(keyword)
+                lineLower.contains(keyword)
             }
 
             if (hasKeyword) {
-                // Check next line (label on one line, value on next)
+                // Next line value
                 if (i + 1 < lines.size) {
                     val nextLine = lines[i + 1].trim()
                     if (isValidUsername(nextLine)) {
@@ -164,25 +168,21 @@ class CredentialFieldParser @Inject constructor() {
                     }
                 }
 
-                // Check same line after colon (label: value pattern)
-                val colonIndex = line.indexOf(':')
-                if (colonIndex != -1 && colonIndex + 1 < line.length) {
+                // Same line after colon
+                val colonIndex = lineLower.indexOf(':')
+                if (colonIndex != -1 && colonIndex + 1 < lines[i].length) {
                     val value = lines[i].substring(colonIndex + 1).trim()
                     if (isValidUsername(value)) {
                         return value.toCharArray()
                     }
                 }
 
-                // Check same line after keyword
+                // After keyword on same line
                 USERNAME_KEYWORDS.forEach { keyword ->
-                    val keywordIndex = line.indexOf(keyword)
-                    if (keywordIndex != -1) {
-                        val afterKeyword = lines[i].substring(
-                            keywordIndex + keyword.length
-                        ).trim()
-                        // Remove leading colon if present
-                        val cleaned = afterKeyword.removePrefix(":")
-                            .trim()
+                    val idx = lineLower.indexOf(keyword)
+                    if (idx != -1) {
+                        val after = lines[i].substring(idx + keyword.length).trim()
+                        val cleaned = after.removePrefix(":").trim()
                         if (isValidUsername(cleaned)) {
                             return cleaned.toCharArray()
                         }
@@ -211,15 +211,14 @@ class CredentialFieldParser @Inject constructor() {
      */
     private fun extractPassword(lines: List<String>): CharArray? {
         for (i in lines.indices) {
-            val line = lines[i].lowercase()
+            val lineLower = lines[i].lowercase()
 
-            // Check if line contains password keyword
             val hasKeyword = PASSWORD_KEYWORDS.any { keyword ->
-                line.contains(keyword)
+                lineLower.contains(keyword)
             }
 
             if (hasKeyword) {
-                // Check next line
+                // Next line value
                 if (i + 1 < lines.size) {
                     val nextLine = lines[i + 1].trim()
                     if (isValidPassword(nextLine)) {
@@ -227,24 +226,21 @@ class CredentialFieldParser @Inject constructor() {
                     }
                 }
 
-                // Check same line after colon
-                val colonIndex = line.indexOf(':')
-                if (colonIndex != -1 && colonIndex + 1 < line.length) {
+                // Same line after colon
+                val colonIndex = lineLower.indexOf(':')
+                if (colonIndex != -1 && colonIndex + 1 < lines[i].length) {
                     val value = lines[i].substring(colonIndex + 1).trim()
                     if (isValidPassword(value)) {
                         return value.toCharArray()
                     }
                 }
 
-                // Check same line after keyword
+                // After keyword on same line
                 PASSWORD_KEYWORDS.forEach { keyword ->
-                    val keywordIndex = line.indexOf(keyword)
-                    if (keywordIndex != -1) {
-                        val afterKeyword = lines[i].substring(
-                            keywordIndex + keyword.length
-                        ).trim()
-                        val cleaned = afterKeyword.removePrefix(":")
-                            .trim()
+                    val idx = lineLower.indexOf(keyword)
+                    if (idx != -1) {
+                        val after = lines[i].substring(idx + keyword.length).trim()
+                        val cleaned = after.removePrefix(":").trim()
                         if (isValidPassword(cleaned)) {
                             return cleaned.toCharArray()
                         }
@@ -252,7 +248,6 @@ class CredentialFieldParser @Inject constructor() {
                 }
             }
         }
-
         return null
     }
 
@@ -268,44 +263,53 @@ class CredentialFieldParser @Inject constructor() {
      * @return Website URL as CharArray, or null if not found
      */
     private fun extractWebsite(lines: List<String>): CharArray? {
-        // Strategy 1: URL pattern (highest confidence)
+        // 1) Full URL pattern
         for (line in lines) {
             URL_REGEX.find(line)?.let { match ->
                 val url = match.value
-                if (isValidUrl(url)) {
-                    return url.toCharArray()
-                }
+                if (isValidUrl(url)) return url.toCharArray()
             }
         }
 
-        // Strategy 2: Context-based extraction
-        for (i in lines.indices) {
-            val line = lines[i].lowercase()
+        // 2) Domain-only pattern (assume https scheme)
+        for (line in lines) {
+            // Avoid matching email addresses as domain-only URLs
+            if (EMAIL_REGEX.containsMatchIn(line)) continue
 
-            val hasKeyword = WEBSITE_KEYWORDS.any { keyword ->
-                line.contains(keyword)
+            DOMAIN_ONLY_REGEX.find(line)?.let { match ->
+                val candidate = match.value
+                val inferred = if (!candidate.startsWith("http", true)) {
+                    "https://$candidate"
+                } else candidate
+                if (isValidUrl(inferred)) return inferred.toCharArray()
             }
+        }
 
+        // 3) Context-based extraction
+        for (i in lines.indices) {
+            val lineLower = lines[i].lowercase()
+            val hasKeyword = WEBSITE_KEYWORDS.any { keyword ->
+                lineLower.contains(keyword)
+            }
             if (hasKeyword) {
-                // Check next line
                 if (i + 1 < lines.size) {
                     val nextLine = lines[i + 1].trim()
-                    if (isValidUrl(nextLine)) {
-                        return nextLine.toCharArray()
-                    }
+                    val normalized = if (!nextLine.startsWith("http", true) && DOMAIN_ONLY_REGEX.matches(nextLine)) {
+                        "https://$nextLine"
+                    } else nextLine
+                    if (isValidUrl(normalized)) return normalized.toCharArray()
                 }
 
-                // Check same line after colon
-                val colonIndex = line.indexOf(':')
-                if (colonIndex != -1 && colonIndex + 1 < line.length) {
+                val colonIndex = lineLower.indexOf(':')
+                if (colonIndex != -1 && colonIndex + 1 < lines[i].length) {
                     val value = lines[i].substring(colonIndex + 1).trim()
-                    if (isValidUrl(value)) {
-                        return value.toCharArray()
-                    }
+                    val normalized = if (!value.startsWith("http", true) && DOMAIN_ONLY_REGEX.matches(value)) {
+                        "https://$value"
+                    } else value
+                    if (isValidUrl(normalized)) return normalized.toCharArray()
                 }
             }
         }
-
         return null
     }
 
@@ -322,27 +326,11 @@ class CredentialFieldParser @Inject constructor() {
      * @return True if valid username format
      */
     private fun isValidUsername(value: String): Boolean {
-        if (value.isEmpty() || value.length < 3 || value.length > 100) {
-            return false
-        }
-
-        // Not a keyword itself
+        if (value.isEmpty() || value.length < 3 || value.length > 100) return false
         val lowerValue = value.lowercase()
-        if (USERNAME_KEYWORDS.any { it == lowerValue } ||
-            PASSWORD_KEYWORDS.any { it == lowerValue }) {
-            return false
-        }
-
-        // Not all special characters
-        if (value.all { !it.isLetterOrDigit() }) {
-            return false
-        }
-
-        // Not masked value
-        if (value.all { it == '*' || it == '•' || it == '●' }) {
-            return false
-        }
-
+        if (USERNAME_KEYWORDS.any { it == lowerValue } || PASSWORD_KEYWORDS.any { it == lowerValue }) return false
+        if (value.all { !it.isLetterOrDigit() }) return false
+        if (value.all { it == '*' || it == '•' || it == '●' }) return false
         return true
     }
 
@@ -359,28 +347,13 @@ class CredentialFieldParser @Inject constructor() {
      * @return True if valid password format
      */
     private fun isValidPassword(value: String): Boolean {
-        if (value.isEmpty() || value.length < 6 || value.length > 128) {
-            return false
-        }
-
-        // Not masked value
-        if (value.all { it == '*' || it == '•' || it == '●' }) {
-            return false
-        }
-
-        // Not a keyword itself
+        if (value.isEmpty() || value.length < 6 || value.length > 128) return false
+        if (value.all { it == '*' || it == '•' || it == '●' }) return false
         val lowerValue = value.lowercase()
-        if (PASSWORD_KEYWORDS.any { it == lowerValue }) {
-            return false
-        }
-
-        // Prefer passwords with some complexity (letters, numbers, or symbols)
-        // But don't require all three (too restrictive)
+        if (PASSWORD_KEYWORDS.any { it == lowerValue }) return false
         val hasLetter = value.any { it.isLetter() }
         val hasDigit = value.any { it.isDigit() }
         val hasSpecial = value.any { !it.isLetterOrDigit() }
-
-        // At least one of: letters, digits, or symbols
         return hasLetter || hasDigit || hasSpecial
     }
 
@@ -395,10 +368,11 @@ class CredentialFieldParser @Inject constructor() {
     private fun isValidUrl(url: String): Boolean {
         return try {
             val uri = Uri.parse(url)
-            // Must have scheme (http/https) and host
             uri.scheme != null &&
                     uri.host != null &&
-                    (uri.scheme == "http" || uri.scheme == "https")
+                    (uri.scheme == "http" || uri.scheme == "https") &&
+                    // host must have a dot to avoid matching keywords
+                    uri.host!!.contains('.')
         } catch (e: Exception) {
             false
         }

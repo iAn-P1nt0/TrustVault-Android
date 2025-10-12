@@ -1,6 +1,7 @@
 package com.trustvault.android.presentation.ui.screens.ocr
 
 import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.camera.core.ImageCapture
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -64,21 +65,36 @@ fun OcrCaptureScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Camera permission state
     val cameraPermissionState = rememberPermissionState(
         permission = Manifest.permission.CAMERA
     )
 
-    // Show rationale dialog
     var showRationaleDialog by remember { mutableStateOf(false) }
-
-    // Show permanently denied dialog
     var showDeniedDialog by remember { mutableStateOf(false) }
-
-    // ImageCapture use case (provided by CameraPreview)
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
 
-    // Request permission on first composition if not granted
+    // Photo Picker launcher to import a screenshot
+    val pickMediaLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                // Decode bitmap and process
+                val resolver = context.contentResolver
+                try {
+                    resolver.openInputStream(uri)?.use { input ->
+                        val bitmap = android.graphics.BitmapFactory.decodeStream(input)
+                        if (bitmap != null) {
+                            viewModel.processBitmap(bitmap) { ocrResult ->
+                                onCredentialsExtracted(ocrResult)
+                                onNavigateBack()
+                            }
+                        }
+                    }
+                } catch (_: Exception) { /* UI state will show error if needed */ }
+            }
+        }
+    )
+
     LaunchedEffect(Unit) {
         if (!cameraPermissionState.status.isGranted) {
             if (cameraPermissionState.status.shouldShowRationale) {
@@ -89,11 +105,9 @@ fun OcrCaptureScreen(
         }
     }
 
-    // Handle permission denied permanently
     LaunchedEffect(cameraPermissionState.status) {
         if (!cameraPermissionState.status.isGranted &&
             !cameraPermissionState.status.shouldShowRationale) {
-            // Permission denied permanently
             showDeniedDialog = true
         }
     }
@@ -116,7 +130,6 @@ fun OcrCaptureScreen(
                 .padding(padding)
         ) {
             when {
-                // Permission granted - show camera preview
                 cameraPermissionState.status.isGranted -> {
                     CameraPreviewContent(
                         uiState = uiState,
@@ -130,11 +143,13 @@ fun OcrCaptureScreen(
                                 }
                             }
                         },
-                        onDismissError = { viewModel.clearError() }
+                        onDismissError = { viewModel.clearError() },
+                        onImportScreenshot = {
+                            // Limit to images only
+                            pickMediaLauncher.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
                     )
                 }
-
-                // Show rationale dialog
                 showRationaleDialog -> {
                     PermissionRationaleDialog(
                         onConfirm = {
@@ -147,8 +162,6 @@ fun OcrCaptureScreen(
                         }
                     )
                 }
-
-                // Show permanently denied dialog
                 showDeniedDialog -> {
                     PermissionDeniedDialog(
                         onDismiss = {
@@ -157,15 +170,11 @@ fun OcrCaptureScreen(
                         }
                     )
                 }
-
-                // Waiting for permission decision
                 else -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    ) { CircularProgressIndicator() }
                 }
             }
         }
@@ -185,7 +194,8 @@ private fun CameraPreviewContent(
     uiState: com.trustvault.android.presentation.viewmodel.OcrCaptureState,
     onImageCaptureReady: (ImageCapture) -> Unit,
     onCapture: () -> Unit,
-    onDismissError: () -> Unit
+    onDismissError: () -> Unit,
+    onImportScreenshot: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Camera preview (full screen)
@@ -240,26 +250,33 @@ private fun CameraPreviewContent(
                 }
             }
 
-            // Capture button
-            FloatingActionButton(
-                onClick = if (uiState.isProcessing) { {} } else onCapture,
-                modifier = Modifier.size(72.dp),
-                containerColor = if (uiState.isProcessing)
-                    MaterialTheme.colorScheme.surfaceVariant
-                else
-                    MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CameraAlt,
-                    contentDescription = "Capture",
-                    modifier = Modifier.size(32.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                FloatingActionButton(
+                    onClick = if (uiState.isProcessing) { {} } else onCapture,
+                    modifier = Modifier.size(72.dp),
+                    containerColor = if (uiState.isProcessing)
+                        MaterialTheme.colorScheme.surfaceVariant
+                    else
+                        MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CameraAlt,
+                        contentDescription = "Capture",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                // Secondary action: import screenshot
+                ExtendedFloatingActionButton(
+                    onClick = if (uiState.isProcessing) { {} } else onImportScreenshot,
+                    content = { Text("Import screenshot") }
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Tap to scan",
+                text = "Tap to scan or import a screenshot",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White,
                 modifier = Modifier
@@ -277,14 +294,8 @@ private fun CameraPreviewContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
-                action = {
-                    TextButton(onClick = onDismissError) {
-                        Text("Dismiss")
-                    }
-                }
-            ) {
-                Text(errorMessage)
-            }
+                action = { TextButton(onClick = onDismissError) { Text("Dismiss") } }
+            ) { Text(errorMessage) }
         }
     }
 }

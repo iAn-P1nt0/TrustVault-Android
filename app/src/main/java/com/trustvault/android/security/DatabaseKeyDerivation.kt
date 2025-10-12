@@ -15,7 +15,7 @@ import javax.inject.Singleton
  *
  * Security Features:
  * - Master password + device binding (ANDROID_ID)
- * - 100,000 iterations (OWASP recommended minimum)
+ * - 600,000 iterations (OWASP 2025 standard for PBKDF2-HMAC-SHA256)
  * - 256-bit output key length
  * - Additional random salt stored securely
  * - Protection against rainbow table attacks
@@ -34,7 +34,7 @@ class DatabaseKeyDerivation @Inject constructor(
      * 1. Master password (user input)
      * 2. Device-specific identifier (ANDROID_ID)
      * 3. Random salt (generated once, stored encrypted)
-     * 4. PBKDF2 with 100,000 iterations
+     * 4. PBKDF2-HMAC-SHA256 with 600,000 iterations (OWASP 2025 standard)
      *
      * @param masterPassword The user's master password
      * @return 256-bit key suitable for AES-256 encryption
@@ -157,9 +157,10 @@ class DatabaseKeyDerivation @Inject constructor(
     }
 
     companion object {
-        // OWASP recommends minimum 100,000 iterations for PBKDF2
-        // Consider increasing to 310,000+ for even better security
-        private const val PBKDF2_ITERATIONS = 100_000
+        // OWASP 2025 recommends minimum 600,000 iterations for PBKDF2-HMAC-SHA256
+        // Updated from 100,000 to meet current security standards
+        // Reference: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+        private const val PBKDF2_ITERATIONS = 600_000
 
         // 256-bit key for AES-256 encryption
         private const val KEY_LENGTH_BITS = 256

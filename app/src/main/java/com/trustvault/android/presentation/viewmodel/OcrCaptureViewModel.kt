@@ -165,6 +165,57 @@ class OcrCaptureViewModel @Inject constructor(
     }
 
     /**
+     * Process a Bitmap (e.g., user-selected screenshot) with OCR.
+     *
+     * @param bitmap Bitmap image to process
+     * @param onSuccess Callback with extracted credentials
+     */
+    fun processBitmap(
+        bitmap: android.graphics.Bitmap,
+        onSuccess: (OcrResult) -> Unit
+    ) {
+        _uiState.update { it.copy(isProcessing = true, error = null) }
+        viewModelScope.launch {
+            val result = ocrProcessor.processBitmap(bitmap)
+
+            result.fold(
+                onSuccess = { ocrResult ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            extractedData = ocrResult,
+                            error = null
+                        )
+                    }
+                    onSuccess(ocrResult)
+                },
+                onFailure = { exception ->
+                    val errorMessage = when (exception) {
+                        is OcrException.NoTextDetectedException ->
+                            "No text found in image. Please select a clearer screenshot of the login form."
+
+                        is OcrException.ParsingFailedException ->
+                            "Could not detect credential fields in the screenshot. Try again or enter manually."
+
+                        is OcrException.RecognitionFailedException ->
+                            "Text recognition failed on the screenshot. Please try again."
+
+                        else ->
+                            "OCR processing failed: ${exception.message}"
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            error = errorMessage
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    /**
      * Clear error message.
      */
     fun clearError() {

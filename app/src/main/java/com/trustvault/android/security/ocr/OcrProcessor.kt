@@ -2,6 +2,8 @@ package com.trustvault.android.security.ocr
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.OptIn
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -91,6 +93,7 @@ class OcrProcessor @Inject constructor(
      * @param imageProxy CameraX image from capture
      * @return Result.success(OcrResult) or Result.failure(OcrException)
      */
+    @OptIn(ExperimentalGetImage::class)
     suspend fun processImage(imageProxy: ImageProxy): Result<OcrResult> {
         return withContext(Dispatchers.Default) {
             try {

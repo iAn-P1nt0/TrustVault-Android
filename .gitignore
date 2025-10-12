@@ -1,116 +1,76 @@
-# Gradle files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Gradle
 .gradle/
-build/
-*/build/
+**/build/
+**/out/
+**/tmp/
 
-# Local configuration file (sdk path, etc)
+# Kotlin/Jetpack Compose
+.kotlinc/
+.ksp/
+**/kspCaches/
+
+# Android specific
 local.properties
-
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
 captures/
 .externalNativeBuild/
 .cxx/
-*.aab
-*.apk
-output-metadata.json
 
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+# Build outputs
+**/*.apk
+**/*.aab
+**/*.ap_
+**/outputs/
 
-# Keystore files
+# Logs
+*.log
+
+# Keystore and signing (DO NOT COMMIT SECRETS)
 *.jks
 *.keystore
+keystore.properties
+signing.properties
 
-# Google Services (e.g. APIs or Firebase)
+# Google / Firebase config (keep out unless intentionally committed)
 google-services.json
+GoogleService-Info.plist
 
-# Android Profiling
-*.hprof
+# NDK / CMake
+**/.cxx/
+**/.externalNativeBuild/
 
-# Room schema exports
-app/schemas/
+# Misc
+*.swp
+*.swo
+*.orig
 
-# ------------------------- Added by Copilot: enhanced ignore set -------------------------
-# macOS / Windows metadata
-.DS_Store
-Thumbs.db
+# Coverage / Reports
+**/reports/
+**/coverage/
 
-# Additional IntelliJ/Android Studio cache files (workspace/caches are ephemeral)
-.idea/*workspace.xml
-.idea/*tasks.xml
-/.idea/caches/
-/.idea/libraries/
-/.idea/gradle.xml
-/.idea/modules.xml
-.idea/dictionaries/
-.idea/assetWizardSettings.xml
-out/
+# Lint
+**/lint*/
 
-# VS Code
+# Room schema: keep versioned schemas (do not ignore)
+# /app/schemas/  # intentionally tracked for migration testing
+
+# Fastlane (if used)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# VCS
 .vscode/
 
-# Gradle and tooling caches
-.gradle-test-kit/
-**/build/
-
-# Kotlin/Gradle
-.kotlin/
-
-# Local env/config and secrets (keep out of VCS)
-.env
-.env.*
-*.env
-*.env.*
-key.properties
-keystore.properties
-secret.properties
-*.properties.local
-
-# Firebase/Crashlytics generated files
-app/fabric.properties
-app/crashlytics.properties
-app/crashlytics-build.properties
-firebase-debug.log
-
-# AI assistant / local tooling
-.claude/
-
-# Coverage and reports
-*.ec
-*.exec
-jacoco.exec
-coverage/
-coverage-final.json
-
-# Node/Yarn (harmless if unused, avoids accidental JS tooling noise)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Misc temp and patch files
-*.tmp
-*.temp
-*.trace
-*.orig
-*.rej
-*~
-
-# Android artifacts (additional)
-*.apks
-*.apksigner
-*.dex
-*.class
-
-# CMake/NDK extra
-.cmake/
-cmake-build-*/
-# ----------------------- End of Copilot additions -----------------------

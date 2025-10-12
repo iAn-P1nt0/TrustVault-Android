@@ -79,7 +79,10 @@ fun CameraPreview(
 
         // Configure ImageCapture use case
         val imageCaptureUseCase = ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            // Prefer highest quality for OCR accuracy over latency
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            // Increase JPEG quality to improve text sharpness
+            .setJpegQuality(95)
             .build()
 
         try {
