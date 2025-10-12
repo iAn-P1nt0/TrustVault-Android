@@ -20,7 +20,8 @@ class UnlockViewModel @Inject constructor(
     private val passwordHasher: PasswordHasher,
     private val preferencesManager: PreferencesManager,
     private val biometricAuthManager: BiometricAuthManager,
-    private val databaseKeyManager: DatabaseKeyManager
+    private val databaseKeyManager: DatabaseKeyManager,
+    private val biometricPasswordStorage: com.trustvault.android.security.BiometricPasswordStorage
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UnlockUiState())
@@ -82,8 +83,44 @@ class UnlockViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Unlocks the app using biometric authentication.
+     *
+     * SECURITY FIX: This method now properly initializes the database
+     * with the stored master password after successful biometric authentication.
+     *
+     * The master password is stored encrypted in EncryptedSharedPreferences
+     * when the user enables biometric authentication.
+     */
     fun unlockWithBiometric(onSuccess: () -> Unit) {
-        onSuccess()
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                // Retrieve encrypted master password
+                val storedPassword = biometricPasswordStorage.getPassword()
+
+                if (storedPassword == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Biometric password not found. Please unlock with password."
+                    )
+                    return@launch
+                }
+
+                // SECURITY: Initialize database with derived encryption key
+                // The database key is derived from the stored master password
+                databaseKeyManager.initializeDatabase(storedPassword)
+
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Biometric unlock failed: ${e.message}"
+                )
+            }
+        }
     }
 }
 

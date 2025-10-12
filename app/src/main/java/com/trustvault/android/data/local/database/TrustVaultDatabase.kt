@@ -12,7 +12,7 @@ import com.trustvault.android.data.local.entity.CredentialEntity
 @Database(
     entities = [CredentialEntity::class],
     version = 1,
-    exportSchema = true
+    exportSchema = false  // SECURITY: Don't export schema in production
 )
 abstract class TrustVaultDatabase : RoomDatabase() {
     abstract fun credentialDao(): CredentialDao

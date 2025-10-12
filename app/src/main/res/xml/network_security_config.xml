@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for TrustVault
+
+    SECURITY: This configuration enforces secure network communication practices
+    even though the current app is fully offline.
+
+    Defense-in-depth: If network features are added in the future, this config
+    ensures all communication is encrypted and secure by default.
+-->
+<network-security-config>
+    <!-- Base configuration for all network traffic -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Only trust system certificate authorities -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+        SECURITY RATIONALE:
+
+        1. cleartextTrafficPermitted="false"
+           - Blocks all HTTP traffic (only HTTPS allowed)
+           - Prevents accidental plaintext data transmission
+           - Mitigates MITM attacks
+
+        2. System CA trust only
+           - Trusts only system-installed certificate authorities
+           - User-installed CAs are NOT trusted (prevents some MITM attacks)
+           - Corporate proxies may require user CA trust (disabled for security)
+
+        3. No debug overrides
+           - Same security in debug and release builds
+           - Prevents relaxed security during development
+    -->
+
+    <!--
+        Future enhancement: Add certificate pinning when/if API integration is added
+
+        <domain-config>
+            <domain includeSubdomains="true">api.trustvault.com</domain>
+            <pin-set expiration="2026-01-01">
+                <pin digest="SHA-256">base64_encoded_certificate_hash</pin>
+                <pin digest="SHA-256">backup_certificate_hash</pin>
+            </pin-set>
+        </domain-config>
+    -->
+</network-security-config>
