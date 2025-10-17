@@ -8,16 +8,30 @@ import android.view.autofill.AutofillId
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import com.trustvault.android.R
-import com.trustvault.android.data.repository.CredentialRepository
+import com.trustvault.android.TrustVaultApplication
 import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.security.DatabaseKeyManager
-import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+
+/**
+ * Hilt EntryPoint for accessing dependencies in AutofillService.
+ * Services cannot use @AndroidEntryPoint directly, so we use EntryPoint pattern.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface AutofillServiceEntryPoint {
+    fun credentialRepository(): com.trustvault.android.domain.repository.CredentialRepository
+    fun databaseKeyManager(): DatabaseKeyManager
+}
 
 /**
  * TrustVault AutofillService implementation.
@@ -34,17 +48,27 @@ import javax.inject.Inject
  * - M1: Proper Platform Usage - Uses Android AutofillService API correctly
  * - M2: Secure Data Storage - Credentials remain encrypted in database
  * - M4: Secure Authentication - Requires unlock before autofill
+ *
+ * Note: Uses Hilt EntryPoint pattern for dependency injection since
+ * @AndroidEntryPoint is not fully supported for AutofillService.
  */
-@AndroidEntryPoint
 class TrustVaultAutofillService : AutofillService() {
 
-    @Inject
-    lateinit var credentialRepository: CredentialRepository
-
-    @Inject
-    lateinit var databaseKeyManager: DatabaseKeyManager
+    private lateinit var credentialRepository: com.trustvault.android.domain.repository.CredentialRepository
+    private lateinit var databaseKeyManager: DatabaseKeyManager
 
     private val serviceScope = CoroutineScope(Dispatchers.Main)
+
+    override fun onCreate() {
+        super.onCreate()
+        // Manually inject dependencies using Hilt EntryPoint
+        val entryPoint = EntryPointAccessors.fromApplication(
+            applicationContext,
+            AutofillServiceEntryPoint::class.java
+        )
+        credentialRepository = entryPoint.credentialRepository()
+        databaseKeyManager = entryPoint.databaseKeyManager()
+    }
 
     companion object {
         private const val TAG = "TrustVaultAutofill"
