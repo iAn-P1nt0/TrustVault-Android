@@ -14,6 +14,7 @@ data class Credential(
     val website: String = "",
     val notes: String = "",
     val category: CredentialCategory = CredentialCategory.LOGIN,
+    val packageName: String = "", // Android package name for autofill matching
     val createdAt: Date = Date(),
     val updatedAt: Date = Date()
 )

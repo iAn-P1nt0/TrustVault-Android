@@ -26,6 +26,7 @@ class CredentialMapper @Inject constructor(
             website = credential.website, // Plain text for search
             notes = fieldEncryptor.encrypt(credential.notes),
             category = credential.category.name,
+            packageName = credential.packageName, // Plain text for autofill matching
             createdAt = credential.createdAt.time,
             updatedAt = credential.updatedAt.time
         )
@@ -43,6 +44,7 @@ class CredentialMapper @Inject constructor(
             website = entity.website,
             notes = fieldEncryptor.decrypt(entity.notes),
             category = CredentialCategory.fromString(entity.category),
+            packageName = entity.packageName, // Plain text for autofill matching
             createdAt = Date(entity.createdAt),
             updatedAt = Date(entity.updatedAt)
         )

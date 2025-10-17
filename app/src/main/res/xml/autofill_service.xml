@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Autofill service configuration for TrustVault.
+
+  Defines compatibility and supported field types for Android AutofillService.
+-->
+<autofill-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.trustvault.android.presentation.MainActivity">
+
+    <!--
+      Compatibility configuration:
+      - maxLongVersionCode: Maximum supported Android version (for future use)
+      - compatibilityPackages: Apps this service is compatible with (empty = all apps)
+    -->
+
+</autofill-service>

@@ -17,6 +17,7 @@ data class CredentialEntity(
     val website: String, // Plain text for search/display
     val notes: String, // Encrypted
     val category: String, // Plain text enum value
+    val packageName: String = "", // Plain text - Android package name for autofill matching
     val createdAt: Long,
     val updatedAt: Long
 )
