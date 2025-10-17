@@ -148,11 +148,153 @@ class TrustVaultAutofillService : AutofillService() {
         // PII-safe logging
         Log.d(TAG, "onSaveRequest: Save request received")
 
-        // For MVP, we don't automatically save new credentials
-        // This prevents unintended credential creation
-        // Future enhancement: Prompt user to save new credentials
-        Log.d(TAG, "Auto-save not implemented in MVP - user must manually add credentials")
+        serviceScope.launch {
+            try {
+                handleSaveRequest(request, callback)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling save request: ${e.message}", e)
+                callback.onFailure("Error processing save request")
+            }
+        }
+    }
+
+    private suspend fun handleSaveRequest(request: SaveRequest, callback: SaveCallback) {
+        // SECURITY: Check if database is unlocked
+        if (!databaseKeyManager.isDatabaseInitialized()) {
+            Log.d(TAG, "Database not unlocked - cannot save credentials")
+            callback.onFailure("User not authenticated")
+            return
+        }
+
+        // Parse credentials from save request
+        val savedCredential = parseSaveRequest(request)
+        if (savedCredential == null) {
+            Log.w(TAG, "Could not parse credentials from save request")
+            callback.onFailure("Invalid save data")
+            return
+        }
+
+        Log.d(TAG, "Parsed save request: package=${savedCredential.packageName}, hasUsername=${savedCredential.username.isNotEmpty()}, hasPassword=${savedCredential.password.isNotEmpty()}")
+
+        // Check if credential already exists
+        val existingCredential = withContext(Dispatchers.IO) {
+            findExistingCredential(savedCredential)
+        }
+
+        // Launch confirmation UI
+        val intent = AutofillSaveActivity.createIntent(
+            context = this@TrustVaultAutofillService,
+            savedCredential = savedCredential,
+            existingCredential = existingCredential
+        )
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+
+        // Signal success - actual save happens in confirmation activity
         callback.onSuccess()
+    }
+
+    /**
+     * Parses SaveRequest to extract username and password.
+     */
+    private fun parseSaveRequest(request: SaveRequest): SavedCredential? {
+        val structure = request.fillContexts.lastOrNull()?.structure ?: return null
+
+        var username = ""
+        var password = ""
+        val packageName = structure.activityComponent.packageName
+        var webDomain: String? = null
+
+        // Extract data from each dataset in the request
+        request.datasetIds?.forEach { datasetId ->
+            val clientState = request.clientState ?: return@forEach
+            // Client state contains the autofill data
+        }
+
+        // Parse structure to find filled fields
+        val fields = mutableListOf<AutofillField>()
+        for (i in 0 until structure.windowNodeCount) {
+            val windowNode = structure.getWindowNodeAt(i)
+            extractSaveData(windowNode.rootViewNode, fields) { field, value ->
+                when (field.fieldType) {
+                    AutofillFieldType.USERNAME -> {
+                        username = value
+                        if (webDomain == null) webDomain = field.webDomain
+                    }
+                    AutofillFieldType.PASSWORD -> password = value
+                }
+            }
+        }
+
+        if (username.isEmpty() && password.isEmpty()) {
+            return null
+        }
+
+        return SavedCredential(
+            username = username,
+            password = password,
+            packageName = packageName,
+            webDomain = webDomain
+        )
+    }
+
+    /**
+     * Recursively extracts autofill values from ViewNode.
+     */
+    private fun extractSaveData(
+        node: AssistStructure.ViewNode,
+        fields: MutableList<AutofillField>,
+        onFieldFound: (AutofillField, String) -> Unit
+    ) {
+        val autofillId = node.autofillId
+        val autofillHints = node.autofillHints
+        val autofillValue = node.autofillValue
+
+        if (autofillId != null && autofillHints != null && autofillValue != null) {
+            val fieldType = determineFieldType(autofillHints)
+            if (fieldType != null && autofillValue.isText) {
+                val field = AutofillField(
+                    autofillId = autofillId,
+                    fieldType = fieldType,
+                    webDomain = node.webDomain,
+                    hints = autofillHints.toList()
+                )
+                val value = autofillValue.textValue.toString()
+                onFieldFound(field, value)
+            }
+        }
+
+        // Recursively process children
+        for (i in 0 until node.childCount) {
+            extractSaveData(node.getChildAt(i), fields, onFieldFound)
+        }
+    }
+
+    /**
+     * Finds existing credential that matches the saved credential.
+     */
+    private suspend fun findExistingCredential(saved: SavedCredential): Credential? {
+        val allCredentials = credentialRepository.getAllCredentials().first()
+
+        return allCredentials.firstOrNull { credential ->
+            // Match by package name and username
+            if (credential.packageName == saved.packageName &&
+                credential.username.equals(saved.username, ignoreCase = true)) {
+                return@firstOrNull true
+            }
+
+            // Match by web domain and username
+            if (saved.webDomain != null && credential.website.isNotEmpty()) {
+                val credentialDomain = extractDomain(credential.website)
+                val savedDomain = extractDomain(saved.webDomain)
+                if (credentialDomain == savedDomain &&
+                    credential.username.equals(saved.username, ignoreCase = true)) {
+                    return@firstOrNull true
+                }
+            }
+
+            false
+        }
     }
 
     /**
@@ -278,7 +420,7 @@ class TrustVaultAutofillService : AutofillService() {
 
             // Remove www. prefix for better matching
             normalized.removePrefix("www.")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             url.lowercase()
         }
     }
@@ -370,3 +512,15 @@ enum class AutofillFieldType {
     USERNAME,
     PASSWORD
 }
+
+/**
+ * Represents credential data parsed from a save request.
+ */
+@kotlinx.parcelize.Parcelize
+data class SavedCredential(
+    val username: String,
+    val password: String,
+    val packageName: String,
+    val webDomain: String?
+) : android.os.Parcelable
+

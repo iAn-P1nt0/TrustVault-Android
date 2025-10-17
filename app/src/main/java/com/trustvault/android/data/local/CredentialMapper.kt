@@ -4,7 +4,6 @@ import com.trustvault.android.data.local.entity.CredentialEntity
 import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.domain.model.CredentialCategory
 import com.trustvault.android.security.FieldEncryptor
-import java.util.Date
 import javax.inject.Inject
 
 /**
@@ -27,8 +26,8 @@ class CredentialMapper @Inject constructor(
             notes = fieldEncryptor.encrypt(credential.notes),
             category = credential.category.name,
             packageName = credential.packageName, // Plain text for autofill matching
-            createdAt = credential.createdAt.time,
-            updatedAt = credential.updatedAt.time
+            createdAt = credential.createdAt,
+            updatedAt = credential.updatedAt
         )
     }
 
@@ -45,8 +44,8 @@ class CredentialMapper @Inject constructor(
             notes = fieldEncryptor.decrypt(entity.notes),
             category = CredentialCategory.fromString(entity.category),
             packageName = entity.packageName, // Plain text for autofill matching
-            createdAt = Date(entity.createdAt),
-            updatedAt = Date(entity.updatedAt)
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt
         )
     }
 

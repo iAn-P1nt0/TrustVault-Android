@@ -1,11 +1,13 @@
 package com.trustvault.android.domain.model
 
-import java.util.Date
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
 /**
  * Domain model for a credential.
  * Contains unencrypted data for use in the application.
  */
+@Parcelize
 data class Credential(
     val id: Long = 0,
     val title: String,
@@ -15,6 +17,6 @@ data class Credential(
     val notes: String = "",
     val category: CredentialCategory = CredentialCategory.LOGIN,
     val packageName: String = "", // Android package name for autofill matching
-    val createdAt: Date = Date(),
-    val updatedAt: Date = Date()
-)
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+) : Parcelable

@@ -2,14 +2,13 @@ package com.trustvault.android.domain.usecase
 
 import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.domain.repository.CredentialRepository
-import java.util.Date
 import javax.inject.Inject
 
 class SaveCredentialUseCase @Inject constructor(
     private val repository: CredentialRepository
 ) {
     suspend operator fun invoke(credential: Credential): Long {
-        val now = Date()
+        val now = System.currentTimeMillis()
         val updatedCredential = if (credential.id == 0L) {
             credential.copy(createdAt = now, updatedAt = now)
         } else {

@@ -52,6 +52,22 @@
                 android:name="android.autofill"
                 android:resource="@xml/autofill_service" />
         </service>
+
+        <!--
+          AutofillSaveActivity
+          Dialog activity that prompts user to save or update autofilled credentials.
+
+          Security:
+          - Requires explicit user confirmation before saving
+          - Never displays password in clear text
+          - Only accessible from autofill service
+        -->
+        <activity
+            android:name=".autofill.AutofillSaveActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrustVault"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask" />
     </application>
 
 </manifest>
