@@ -11,10 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trustvault.android.presentation.viewmodel.UnlockViewModel
 
@@ -26,6 +28,18 @@ fun UnlockScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Show biometric prompt on launch if available
+    LaunchedEffect(uiState.shouldShowBiometricPromptOnLaunch) {
+        if (uiState.shouldShowBiometricPromptOnLaunch) {
+            // Get FragmentActivity from context
+            val activity = context as? FragmentActivity
+            if (activity != null) {
+                viewModel.showBiometricPrompt(activity, onUnlocked)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -108,7 +122,12 @@ fun UnlockScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedButton(
-                    onClick = { viewModel.unlockWithBiometric(onUnlocked) },
+                    onClick = {
+                        val activity = context as? FragmentActivity
+                        if (activity != null) {
+                            viewModel.showBiometricPrompt(activity, onUnlocked)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(

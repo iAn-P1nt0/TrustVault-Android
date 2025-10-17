@@ -37,15 +37,26 @@ class BiometricAuthManager @Inject constructor(
     }
 
     /**
-     * Shows biometric authentication prompt.
+     * Shows biometric authentication prompt with device credential fallback.
+     *
+     * SECURITY: Uses BIOMETRIC_STRONG | DEVICE_CREDENTIAL for authentication.
+     * - Biometric authentication (fingerprint/face)
+     * - Device credential fallback (PIN/password/pattern)
+     * - No negative button when device credential is available
+     *
+     * @param activity The FragmentActivity context for showing the prompt
+     * @param onSuccess Callback invoked on successful authentication
+     * @param onError Callback invoked on authentication error (includes user cancellation)
+     * @param onUserCancelled Callback invoked when user explicitly cancels (optional)
      */
     fun authenticate(
         activity: FragmentActivity,
         onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        onUserCancelled: (() -> Unit)? = null
     ) {
         val executor = ContextCompat.getMainExecutor(activity)
-        
+
         val biometricPrompt = BiometricPrompt(
             activity,
             executor,
@@ -57,12 +68,20 @@ class BiometricAuthManager @Inject constructor(
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    onError(errString.toString())
+
+                    // Handle user cancellation separately
+                    if (errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
+                        errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                        onUserCancelled?.invoke()
+                    } else {
+                        onError(errString.toString())
+                    }
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    onError("Authentication failed")
+                    // Individual attempt failed, but prompt remains active
+                    // Don't call onError here - let user retry
                 }
             }
         )
@@ -72,7 +91,8 @@ class BiometricAuthManager @Inject constructor(
             .setSubtitle(context.getString(R.string.biometric_prompt_subtitle))
             .setDescription(context.getString(R.string.biometric_prompt_description))
             .setAllowedAuthenticators(AUTHENTICATORS)
-            .setNegativeButtonText(context.getString(R.string.cancel))
+            // IMPORTANT: When DEVICE_CREDENTIAL is set, we should NOT set negative button
+            // The system provides "Use password" option automatically
             .build()
 
         biometricPrompt.authenticate(promptInfo)

@@ -7,14 +7,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.trustvault.android.presentation.ui.screens.auth.MasterPasswordSetupScreen
@@ -26,10 +31,16 @@ import com.trustvault.android.presentation.ui.screens.ocr.OcrCaptureScreen
 import com.trustvault.android.presentation.ui.theme.TrustVaultTheme
 import com.trustvault.android.presentation.viewmodel.AddEditCredentialViewModel
 import com.trustvault.android.presentation.viewmodel.MainViewModel
+import com.trustvault.android.security.AutoLockManager
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var autoLockManager: AutoLockManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -45,6 +56,40 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val mainViewModel: MainViewModel = hiltViewModel()
                     val isMasterPasswordSet by mainViewModel.isMasterPasswordSet.collectAsState(initial = false)
+                    val currentBackStack by navController.currentBackStackEntryAsState()
+                    val currentRoute = currentBackStack?.destination?.route
+
+                    // Track if user is authenticated (not on setup or unlock screens)
+                    var isAuthenticated by remember { mutableStateOf(false) }
+
+                    // Update authentication state based on current route
+                    LaunchedEffect(currentRoute) {
+                        isAuthenticated = when (currentRoute) {
+                            Screen.MasterPasswordSetup.route, Screen.Unlock.route -> false
+                            else -> true
+                        }
+                    }
+
+                    // Record activity when user interacts with authenticated screens
+                    LaunchedEffect(isAuthenticated, currentRoute) {
+                        if (isAuthenticated) {
+                            autoLockManager.recordActivity()
+                        }
+                    }
+
+                    // Monitor database lock state and navigate to unlock screen if locked
+                    LaunchedEffect(isAuthenticated) {
+                        if (isAuthenticated && !mainViewModel.isDatabaseUnlocked()) {
+                            // Database was locked (by AutoLockManager or manual lock)
+                            // Navigate back to unlock screen
+                            navController.navigate(Screen.Unlock.route) {
+                                // Clear back stack to prevent going back to authenticated screens
+                                popUpTo(navController.graph.startDestinationId) {
+                                    inclusive = true
+                                }
+                            }
+                        }
+                    }
 
                     val startDestination = if (isMasterPasswordSet) {
                         Screen.Unlock.route

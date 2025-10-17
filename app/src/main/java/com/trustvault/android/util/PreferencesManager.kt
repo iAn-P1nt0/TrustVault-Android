@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +34,11 @@ class PreferencesManager(private val context: Context) {
             preferences[BIOMETRIC_ENABLED] ?: false
         }
 
+    val lastUnlockTimestamp: Flow<Long?> = context.dataStore.data
+        .map { preferences ->
+            preferences[LAST_UNLOCK_TIMESTAMP]
+        }
+
     suspend fun setMasterPasswordHash(hash: String) {
         context.dataStore.edit { preferences ->
             preferences[MASTER_PASSWORD_SET] = true
@@ -46,6 +52,28 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
+    /**
+     * Records the timestamp of successful unlock.
+     * Used for auto-lock timeout calculations.
+     *
+     * @param timestamp Unix timestamp in milliseconds (System.currentTimeMillis())
+     */
+    suspend fun setLastUnlockTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_UNLOCK_TIMESTAMP] = timestamp
+        }
+    }
+
+    /**
+     * Clears the last unlock timestamp.
+     * Called when the app is locked.
+     */
+    suspend fun clearLastUnlockTimestamp() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(LAST_UNLOCK_TIMESTAMP)
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.clear()
@@ -56,5 +84,6 @@ class PreferencesManager(private val context: Context) {
         private val MASTER_PASSWORD_SET = booleanPreferencesKey("master_password_set")
         private val MASTER_PASSWORD_HASH = stringPreferencesKey("master_password_hash")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
+        private val LAST_UNLOCK_TIMESTAMP = longPreferencesKey("last_unlock_timestamp")
     }
 }

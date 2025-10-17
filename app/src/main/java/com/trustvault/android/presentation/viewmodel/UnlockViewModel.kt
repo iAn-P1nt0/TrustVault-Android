@@ -1,5 +1,6 @@
 package com.trustvault.android.presentation.viewmodel
 
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trustvault.android.security.BiometricAuthManager
@@ -33,10 +34,44 @@ class UnlockViewModel @Inject constructor(
         viewModelScope.launch {
             val isBiometricEnabled = preferencesManager.isBiometricEnabled.first()
             val biometricStatus = biometricAuthManager.isBiometricAvailable()
+            val shouldShowBiometric = biometricStatus == BiometricStatus.AVAILABLE && isBiometricEnabled
+
             _uiState.value = _uiState.value.copy(
-                isBiometricAvailable = biometricStatus == BiometricStatus.AVAILABLE && isBiometricEnabled
+                isBiometricAvailable = shouldShowBiometric,
+                shouldShowBiometricPromptOnLaunch = shouldShowBiometric
             )
         }
+    }
+
+    /**
+     * Shows biometric prompt for authentication.
+     * This is the primary unlock method when biometrics are available.
+     *
+     * @param activity FragmentActivity context required for BiometricPrompt
+     * @param onSuccess Callback when authentication succeeds
+     */
+    fun showBiometricPrompt(activity: FragmentActivity, onSuccess: () -> Unit) {
+        biometricAuthManager.authenticate(
+            activity = activity,
+            onSuccess = {
+                // Biometric authentication succeeded
+                unlockWithBiometric(onSuccess)
+            },
+            onError = { errorMessage ->
+                // Authentication error (hardware failure, etc.)
+                _uiState.value = _uiState.value.copy(
+                    error = errorMessage,
+                    shouldShowBiometricPromptOnLaunch = false
+                )
+            },
+            onUserCancelled = {
+                // User cancelled - allow password input
+                _uiState.value = _uiState.value.copy(
+                    shouldShowBiometricPromptOnLaunch = false,
+                    error = null
+                )
+            }
+        )
     }
 
     fun onPasswordChange(password: String) {
@@ -69,6 +104,9 @@ class UnlockViewModel @Inject constructor(
                     // SECURITY: Initialize database with derived encryption key
                     // The database key is now derived from the authenticated master password
                     databaseKeyManager.initializeDatabase(passwordChars)
+
+                    // Record unlock timestamp for auto-lock timeout
+                    preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
 
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     onSuccess()
@@ -123,6 +161,9 @@ class UnlockViewModel @Inject constructor(
                     // The database key is derived from the stored master password
                     databaseKeyManager.initializeDatabase(passwordChars)
 
+                    // Record unlock timestamp for auto-lock timeout
+                    preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
+
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     onSuccess()
                 } finally {
@@ -143,5 +184,6 @@ data class UnlockUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val isBiometricAvailable: Boolean = false,
+    val shouldShowBiometricPromptOnLaunch: Boolean = false,
     val error: String? = null
 )
