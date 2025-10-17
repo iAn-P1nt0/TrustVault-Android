@@ -65,6 +65,12 @@
     private void secureWipe(char[]);
 }
 
+# Keep the Argon2 engine implementation loaded reflectively by PasswordHasher
+-keep class com.trustvault.android.security.PasswordHasherRealEngine {
+    <init>();
+    *;
+}
+
 # ============================================
 # Logging Removal (Release Builds)
 # ============================================

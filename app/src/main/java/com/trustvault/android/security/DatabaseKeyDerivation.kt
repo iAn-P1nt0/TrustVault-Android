@@ -2,12 +2,14 @@ package com.trustvault.android.security
 
 import android.content.Context
 import android.provider.Settings
+import com.trustvault.android.util.secureWipe
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Base64
 
 /**
  * Derives secure database encryption keys from master password.
@@ -31,16 +33,18 @@ class DatabaseKeyDerivation @Inject constructor(
      * This key is used to encrypt the SQLCipher database.
      *
      * The derivation uses:
-     * 1. Master password (user input)
+     * 1. Master password (user input as CharArray for secure memory handling)
      * 2. Device-specific identifier (ANDROID_ID)
      * 3. Random salt (generated once, stored encrypted)
      * 4. PBKDF2-HMAC-SHA256 with 600,000 iterations (OWASP 2025 standard)
      *
-     * @param masterPassword The user's master password
-     * @return 256-bit key suitable for AES-256 encryption
+     * SECURITY: Accepts CharArray to allow secure memory wiping after use.
+     *
+     * @param masterPassword The user's master password as CharArray
+     * @return 256-bit key suitable for AES-256 encryption (must be wiped after use)
      */
-    fun deriveKey(masterPassword: String): ByteArray {
-        require(masterPassword.isNotBlank()) { "Master password cannot be blank" }
+    fun deriveKey(masterPassword: CharArray): ByteArray {
+        require(masterPassword.isNotEmpty()) { "Master password cannot be empty" }
 
         // Get device-specific identifier
         val deviceId = getDeviceIdentifier()
@@ -51,39 +55,46 @@ class DatabaseKeyDerivation @Inject constructor(
         // Combine device ID and salt for additional entropy
         val finalSalt = (deviceId + salt.contentToString()).toByteArray()
 
-        // Derive key using PBKDF2
-        return deriveKeyWithPBKDF2(
-            password = masterPassword,
-            salt = finalSalt,
-            iterations = PBKDF2_ITERATIONS,
-            keyLength = KEY_LENGTH_BITS
-        )
+        try {
+            // Derive key using PBKDF2
+            return deriveKeyWithPBKDF2(
+                password = masterPassword,
+                salt = finalSalt,
+                iterations = PBKDF2_ITERATIONS,
+                keyLength = KEY_LENGTH_BITS
+            )
+        } finally {
+            // SECURITY CONTROL: Clear salt from memory
+            finalSalt.secureWipe()
+        }
     }
 
     /**
      * Derives a key using PBKDF2-HMAC-SHA256.
      * This is a computationally expensive operation (intentional security feature).
+     *
+     * SECURITY: Accepts CharArray directly to avoid creating intermediate String copies.
      */
     private fun deriveKeyWithPBKDF2(
-        password: String,
+        password: CharArray,
         salt: ByteArray,
         iterations: Int,
         keyLength: Int
     ): ByteArray {
         val spec = PBEKeySpec(
-            password.toCharArray(),
+            password,
             salt,
             iterations,
             keyLength
         )
 
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val key = factory.generateSecret(spec).encoded
-
-        // Clear sensitive data from memory
-        spec.clearPassword()
-
-        return key
+        try {
+            val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            return factory.generateSecret(spec).encoded
+        } finally {
+            // SECURITY CONTROL: Clear sensitive data from memory
+            spec.clearPassword()
+        }
     }
 
     /**
@@ -108,10 +119,7 @@ class DatabaseKeyDerivation @Inject constructor(
 
         return if (encryptedSaltBase64 != null) {
             // Decrypt existing salt
-            val encryptedSalt = android.util.Base64.decode(
-                encryptedSaltBase64,
-                android.util.Base64.NO_WRAP
-            )
+            val encryptedSalt = Base64.getDecoder().decode(encryptedSaltBase64)
             keystoreManager.decrypt(SALT_KEY_ALIAS, encryptedSalt)
         } else {
             // Generate new random salt
@@ -120,10 +128,7 @@ class DatabaseKeyDerivation @Inject constructor(
 
             // Encrypt and store salt
             val encryptedSalt = keystoreManager.encrypt(SALT_KEY_ALIAS, salt)
-            val encryptedSaltBase64 = android.util.Base64.encodeToString(
-                encryptedSalt,
-                android.util.Base64.NO_WRAP
-            )
+            val encryptedSaltBase64 = Base64.getEncoder().encodeToString(encryptedSalt)
 
             prefs.edit()
                 .putString(KEY_SALT, encryptedSaltBase64)
@@ -146,11 +151,17 @@ class DatabaseKeyDerivation @Inject constructor(
     /**
      * Validates that a master password can derive a valid key.
      * Used for testing and validation purposes.
+     *
+     * @param masterPassword The master password as CharArray
+     * @return true if key derivation succeeds and produces correct length key
      */
-    fun validateMasterPassword(masterPassword: String): Boolean {
+    fun validateMasterPassword(masterPassword: CharArray): Boolean {
         return try {
             val key = deriveKey(masterPassword)
-            key.size == KEY_LENGTH_BITS / 8
+            val isValid = key.size == KEY_LENGTH_BITS / 8
+            // SECURITY CONTROL: Clear key from memory
+            key.secureWipe()
+            isValid
         } catch (e: Exception) {
             false
         }

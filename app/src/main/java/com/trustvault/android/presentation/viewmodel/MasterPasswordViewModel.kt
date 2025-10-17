@@ -6,6 +6,8 @@ import com.trustvault.android.security.DatabaseKeyManager
 import com.trustvault.android.security.PasswordHasher
 import com.trustvault.android.security.PasswordStrength
 import com.trustvault.android.util.PreferencesManager
+import com.trustvault.android.util.secureWipe
+import com.trustvault.android.util.toSecureCharArray
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,17 +54,20 @@ class MasterPasswordViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            // SECURITY: Convert password to CharArray for secure memory handling
+            val passwordChars = state.password.toSecureCharArray()
+
             try {
                 _uiState.value = state.copy(isLoading = true)
 
                 // Hash and store master password
-                val hash = passwordHasher.hashPassword(state.password)
+                val hash = passwordHasher.hashPassword(passwordChars)
                 preferencesManager.setMasterPasswordHash(hash)
 
                 // SECURITY: Initialize database with derived encryption key
                 // The database key is now derived from the master password
                 // instead of being hardcoded
-                databaseKeyManager.initializeDatabase(state.password)
+                databaseKeyManager.initializeDatabase(passwordChars)
 
                 _uiState.value = state.copy(isLoading = false)
                 onSuccess()
@@ -71,6 +76,9 @@ class MasterPasswordViewModel @Inject constructor(
                     isLoading = false,
                     error = "Failed to create master password: ${e.message}"
                 )
+            } finally {
+                // SECURITY CONTROL: Clear password from memory
+                passwordChars.secureWipe()
             }
         }
     }

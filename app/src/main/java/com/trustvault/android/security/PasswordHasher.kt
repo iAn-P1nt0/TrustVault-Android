@@ -1,7 +1,6 @@
 package com.trustvault.android.security
 
-import com.lambdapioneer.argon2kt.Argon2Kt
-import com.lambdapioneer.argon2kt.Argon2Mode
+import com.trustvault.android.util.secureWipe
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,35 +11,81 @@ import javax.inject.Singleton
 @Singleton
 class PasswordHasher @Inject constructor() {
 
-    private val argon2Kt = Argon2Kt()
+    /**
+     * Pluggable engine to allow replacing Argon2 implementation in tests.
+     */
+    internal interface Engine {
+        fun hash(password: ByteArray, salt: ByteArray, tCostInIterations: Int, mCostInKibibyte: Int): String
+        fun verify(password: ByteArray, encoded: String): Boolean
+    }
+
+    // Lazily initialized engine to allow tests to inject without touching native libs
+    private var engine: Engine? = null
+    private fun getEngine(): Engine {
+        val existing = engine
+        if (existing != null) return existing
+        // Reflective load to avoid class initialization during unit tests
+        val real = Class.forName("com.trustvault.android.security.PasswordHasherRealEngine")
+            .getDeclaredConstructor()
+            .newInstance() as Engine
+        engine = real
+        return real
+    }
+
+    // Visible for unit tests to inject a fake engine and avoid native libs
+    internal fun setTestEngine(forTests: Engine) {
+        engine = forTests
+    }
 
     /**
      * Hashes a password using Argon2id algorithm.
      * Returns the hash as a String that can be stored.
+     *
+     * SECURITY: Accepts CharArray for secure memory handling. The CharArray
+     * should be wiped by the caller after this method returns.
+     *
+     * @param password The password to hash as CharArray
+     * @return The Argon2id hash as a String (safe to store)
      */
-    fun hashPassword(password: String): String {
-        val passwordBytes = password.toByteArray()
-        val hash = argon2Kt.hash(
-            mode = Argon2Mode.ARGON2_ID,
-            password = passwordBytes,
-            salt = generateSalt(),
-            tCostInIterations = T_COST,
-            mCostInKibibyte = M_COST
-        )
-        return hash.encodedOutputAsString()
+    fun hashPassword(password: CharArray): String {
+        // Convert CharArray to ByteArray for hashing
+        val passwordBytes = String(password).toByteArray(Charsets.UTF_8)
+
+        try {
+            val hashEncoded = getEngine().hash(
+                password = passwordBytes,
+                salt = generateSalt(),
+                tCostInIterations = T_COST,
+                mCostInKibibyte = M_COST
+            )
+            return hashEncoded
+        } finally {
+            // SECURITY CONTROL: Clear password bytes from memory
+            passwordBytes.secureWipe()
+        }
     }
 
     /**
      * Verifies a password against a stored hash.
+     *
+     * SECURITY: Accepts CharArray for secure memory handling. The CharArray
+     * should be wiped by the caller after this method returns.
+     *
+     * @param password The password to verify as CharArray
+     * @param hash The stored Argon2id hash
+     * @return true if password matches hash, false otherwise
      */
-    fun verifyPassword(password: String, hash: String): Boolean {
+    fun verifyPassword(password: CharArray, hash: String): Boolean {
         return try {
-            val passwordBytes = password.toByteArray()
-            argon2Kt.verify(
-                mode = Argon2Mode.ARGON2_ID,
-                encoded = hash,
-                password = passwordBytes
-            )
+            // Convert CharArray to ByteArray for verification
+            val passwordBytes = String(password).toByteArray(Charsets.UTF_8)
+
+            try {
+                getEngine().verify(passwordBytes, hash)
+            } finally {
+                // SECURITY CONTROL: Clear password bytes from memory
+                passwordBytes.secureWipe()
+            }
         } catch (e: Exception) {
             false
         }

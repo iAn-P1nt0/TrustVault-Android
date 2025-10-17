@@ -7,6 +7,8 @@ import com.trustvault.android.security.BiometricStatus
 import com.trustvault.android.security.DatabaseKeyManager
 import com.trustvault.android.security.PasswordHasher
 import com.trustvault.android.util.PreferencesManager
+import com.trustvault.android.util.secureWipe
+import com.trustvault.android.util.toSecureCharArray
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +48,9 @@ class UnlockViewModel @Inject constructor(
 
     fun unlock(onSuccess: () -> Unit) {
         viewModelScope.launch {
+            // SECURITY: Convert password to CharArray for secure memory handling
+            val passwordChars = _uiState.value.password.toSecureCharArray()
+
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
                 val storedHash = preferencesManager.masterPasswordHash.first()
@@ -58,13 +63,12 @@ class UnlockViewModel @Inject constructor(
                     return@launch
                 }
 
-                val password = _uiState.value.password
-                val isValid = passwordHasher.verifyPassword(password, storedHash)
+                val isValid = passwordHasher.verifyPassword(passwordChars, storedHash)
 
                 if (isValid) {
                     // SECURITY: Initialize database with derived encryption key
                     // The database key is now derived from the authenticated master password
-                    databaseKeyManager.initializeDatabase(password)
+                    databaseKeyManager.initializeDatabase(passwordChars)
 
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     onSuccess()
@@ -79,6 +83,9 @@ class UnlockViewModel @Inject constructor(
                     isLoading = false,
                     error = "Authentication failed: ${e.message}"
                 )
+            } finally {
+                // SECURITY CONTROL: Clear password from memory
+                passwordChars.secureWipe()
             }
         }
     }
@@ -108,12 +115,20 @@ class UnlockViewModel @Inject constructor(
                     return@launch
                 }
 
-                // SECURITY: Initialize database with derived encryption key
-                // The database key is derived from the stored master password
-                databaseKeyManager.initializeDatabase(storedPassword)
+                // SECURITY: Convert password to CharArray for secure memory handling
+                val passwordChars = storedPassword.toSecureCharArray()
 
-                _uiState.value = _uiState.value.copy(isLoading = false)
-                onSuccess()
+                try {
+                    // SECURITY: Initialize database with derived encryption key
+                    // The database key is derived from the stored master password
+                    databaseKeyManager.initializeDatabase(passwordChars)
+
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    onSuccess()
+                } finally {
+                    // SECURITY CONTROL: Clear password from memory
+                    passwordChars.secureWipe()
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
