@@ -28,6 +28,11 @@ fun CredentialListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Load credentials when screen appears (after database is initialized)
+    LaunchedEffect(Unit) {
+        viewModel.loadCredentials()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

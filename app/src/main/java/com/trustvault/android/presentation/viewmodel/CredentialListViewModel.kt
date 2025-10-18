@@ -27,10 +27,15 @@ class CredentialListViewModel @Inject constructor(
     val uiState: StateFlow<CredentialListUiState> = _uiState.asStateFlow()
 
     init {
-        loadCredentials()
+        // Don't load credentials in init - they will be loaded when screen is shown
+        // Database initialization happens after user authentication in UnlockViewModel
     }
 
-    private fun loadCredentials() {
+    /**
+     * Load credentials from database.
+     * Call this method after database has been initialized (post-authentication).
+     */
+    fun loadCredentials() {
         getAllCredentialsUseCase()
             .onEach { credentials ->
                 _uiState.value = _uiState.value.copy(
