@@ -1,8 +1,11 @@
 package com.trustvault.android.presentation.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,19 +16,16 @@ import androidx.compose.ui.unit.dp
  *
  * Currently provides:
  * - Lock app option
+ * - Import/Export functionality
+ * - Backup management
  * - About/version information
- *
- * Future enhancements:
- * - Biometric settings
- * - Auto-lock timeout configuration
- * - Theme preferences
- * - Backup/restore settings
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onLockApp: () -> Unit
+    onLockApp: () -> Unit,
+    onNavigateToImportExport: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -46,6 +46,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             // Lock App Button
@@ -63,7 +64,39 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
+                    Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Lock App")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Import/Export Section
+            Text(
+                "Data Management",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Button(
+                    onClick = onNavigateToImportExport,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Import & Export")
                 }
             }
 

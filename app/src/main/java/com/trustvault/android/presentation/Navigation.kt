@@ -19,4 +19,7 @@ sealed class Screen(val route: String) {
     }
     object PasswordGenerator : Screen("password_generator")
     object OcrCapture : Screen("ocr_capture")
+    object ImportExport : Screen("import_export")
+    object CsvImport : Screen("csv_import")
+    object BackupManagement : Screen("backup_management")
 }
