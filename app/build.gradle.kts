@@ -77,10 +77,15 @@ android {
 dependencies {
     // AndroidX Core - Updated for API 35 compatibility
     implementation("androidx.core:core-ktx:1.13.1")
+    // AppCompat: required for AppCompatActivity used with Hilt @AndroidEntryPoint
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-process:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
+    // Ensure ComponentActivity and activity APIs are available
+    implementation("androidx.activity:activity:1.9.1")
+    implementation("androidx.activity:activity-ktx:1.9.1")
 
     // Jetpack Compose - Updated BOM for API 35 compatibility
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
@@ -94,6 +99,11 @@ dependencies {
     // Security - Updated for API 35 compatibility
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
+
+    // Credential Manager API - For modern password and passkey flows
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
 
     // Room with SQLCipher - Updated for API 35 compatibility
     implementation("androidx.room:room-runtime:2.6.1")

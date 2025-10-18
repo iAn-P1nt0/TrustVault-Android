@@ -26,6 +26,7 @@ class CredentialMapper @Inject constructor(
             notes = fieldEncryptor.encrypt(credential.notes),
             category = credential.category.name,
             packageName = credential.packageName, // Plain text for autofill matching
+            otpSecret = credential.otpSecret?.let { fieldEncryptor.encrypt(it) }, // Encrypt TOTP secret
             createdAt = credential.createdAt,
             updatedAt = credential.updatedAt
         )
@@ -44,6 +45,7 @@ class CredentialMapper @Inject constructor(
             notes = fieldEncryptor.decrypt(entity.notes),
             category = CredentialCategory.fromString(entity.category),
             packageName = entity.packageName, // Plain text for autofill matching
+            otpSecret = entity.otpSecret?.let { fieldEncryptor.decrypt(it) }, // Decrypt TOTP secret
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt
         )

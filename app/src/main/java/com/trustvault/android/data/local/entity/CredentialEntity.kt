@@ -18,6 +18,7 @@ data class CredentialEntity(
     val notes: String, // Encrypted
     val category: String, // Plain text enum value
     val packageName: String = "", // Plain text - Android package name for autofill matching
+    val otpSecret: String? = null, // Encrypted - Base32-encoded TOTP secret, null if not configured
     val createdAt: Long,
     val updatedAt: Long
 )

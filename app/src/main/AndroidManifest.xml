@@ -68,6 +68,37 @@
             android:theme="@style/Theme.TrustVault"
             android:excludeFromRecents="true"
             android:launchMode="singleTask" />
+
+        <!--
+          TrustVault Credential Provider Service (Future)
+          Modern Credential Manager integration for Android 14+ (API 34+)
+
+          Status: Stub implementation for future enhancement
+          Provides credentials via the Credential Manager bottom sheet UI.
+          Works alongside AutofillService for maximum compatibility.
+
+          Security:
+          - Requires BIND_CREDENTIAL_PROVIDER_SERVICE permission
+          - Only system can bind to this service
+          - Database must be unlocked before providing credentials
+
+          Note: Currently disabled - service not yet fully implemented.
+              Enable in AndroidManifest when implementation is complete.
+        -->
+
+        <!--
+          Credential Selection Activity
+          Handles user selection from Credential Manager bottom sheet.
+
+          Security:
+          - Not exported - only accessible via PendingIntent
+          - Returns selected credential to Credential Manager
+        -->
+        <activity
+            android:name=".credentialmanager.CredentialSelectionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true" />
     </application>
 
 </manifest>

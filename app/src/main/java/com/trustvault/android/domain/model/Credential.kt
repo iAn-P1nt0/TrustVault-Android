@@ -17,6 +17,7 @@ data class Credential(
     val notes: String = "",
     val category: CredentialCategory = CredentialCategory.LOGIN,
     val packageName: String = "", // Android package name for autofill matching
+    val otpSecret: String? = null, // Base32-encoded TOTP secret, null if not configured
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) : Parcelable
