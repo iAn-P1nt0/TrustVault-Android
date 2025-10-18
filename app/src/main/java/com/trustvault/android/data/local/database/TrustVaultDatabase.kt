@@ -13,10 +13,11 @@ import com.trustvault.android.data.local.entity.CredentialEntity
  * - v1: Initial schema (title, username, password, website, notes, category, timestamps)
  * - v2: Added packageName field for Android AutofillService support
  * - v3: Added otpSecret field for TOTP/2FA support (nullable, encrypted)
+ * - v4: Added allowedDomains for URL/domain matching overrides (JSON array, plain text)
  */
 @Database(
     entities = [CredentialEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false  // SECURITY: Don't export schema in production
 )
 abstract class TrustVaultDatabase : RoomDatabase() {

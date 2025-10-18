@@ -8,6 +8,11 @@ import javax.inject.Inject
 
 /**
  * Maps between domain models and encrypted database entities.
+ *
+ * **Serialization Strategy:**
+ * - Sensitive fields (username, password, notes, otpSecret): AES-256-GCM encrypted
+ * - URL matching fields (website, packageName, allowedDomains): Plain text (used for search/matching)
+ * - allowedDomains: Serialized as JSON array for flexibility
  */
 class CredentialMapper @Inject constructor(
     private val fieldEncryptor: FieldEncryptor
@@ -27,6 +32,7 @@ class CredentialMapper @Inject constructor(
             category = credential.category.name,
             packageName = credential.packageName, // Plain text for autofill matching
             otpSecret = credential.otpSecret?.let { fieldEncryptor.encrypt(it) }, // Encrypt TOTP secret
+            allowedDomains = serializeAllowedDomains(credential.allowedDomains), // JSON array
             createdAt = credential.createdAt,
             updatedAt = credential.updatedAt
         )
@@ -46,6 +52,7 @@ class CredentialMapper @Inject constructor(
             category = CredentialCategory.fromString(entity.category),
             packageName = entity.packageName, // Plain text for autofill matching
             otpSecret = entity.otpSecret?.let { fieldEncryptor.decrypt(it) }, // Decrypt TOTP secret
+            allowedDomains = deserializeAllowedDomains(entity.allowedDomains), // Parse JSON array
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt
         )
@@ -56,5 +63,79 @@ class CredentialMapper @Inject constructor(
      */
     fun toDomainList(entities: List<CredentialEntity>): List<Credential> {
         return entities.map { toDomain(it) }
+    }
+
+    /**
+     * Serializes allowed domains list to JSON array string.
+     * Used for storing in database.
+     *
+     * Simple JSON format: ["domain1.com","domain2.com","*.domain3.com"]
+     */
+    private fun serializeAllowedDomains(domains: List<String>): String {
+        if (domains.isEmpty()) return "[]"
+
+        return try {
+            val jsonParts = domains.map { domain ->
+                "\"${domain.replace("\"", "\\\"")}\""
+            }
+            "[${jsonParts.joinToString(",")}]"
+        } catch (e: Exception) {
+            "[]" // Fallback to empty array on serialization error
+        }
+    }
+
+    /**
+     * Deserializes JSON array string to allowed domains list.
+     * Used for loading from database.
+     *
+     * Simple JSON format: ["domain1.com","domain2.com","*.domain3.com"]
+     */
+    private fun deserializeAllowedDomains(jsonString: String): List<String> {
+        return try {
+            if (jsonString.isEmpty() || jsonString == "[]") return emptyList()
+
+            // Remove [ and ]
+            val trimmed = jsonString.trim().removePrefix("[").removeSuffix("]")
+            if (trimmed.isEmpty()) return emptyList()
+
+            // Split by comma but respect quoted strings
+            val domains = mutableListOf<String>()
+            var current = StringBuilder()
+            var inQuotes = false
+            var escaped = false
+
+            for (char in trimmed) {
+                when {
+                    escaped -> {
+                        current.append(char)
+                        escaped = false
+                    }
+                    char == '\\' && inQuotes -> {
+                        escaped = true
+                    }
+                    char == '\"' -> {
+                        inQuotes = !inQuotes
+                    }
+                    char == ',' && !inQuotes -> {
+                        val domain = current.toString().trim().trim('"')
+                        if (domain.isNotEmpty()) {
+                            domains.add(domain)
+                        }
+                        current = StringBuilder()
+                    }
+                    else -> current.append(char)
+                }
+            }
+
+            // Add last domain
+            val domain = current.toString().trim().trim('"')
+            if (domain.isNotEmpty()) {
+                domains.add(domain)
+            }
+
+            domains
+        } catch (e: Exception) {
+            emptyList() // Fallback to empty list on deserialization error
+        }
     }
 }

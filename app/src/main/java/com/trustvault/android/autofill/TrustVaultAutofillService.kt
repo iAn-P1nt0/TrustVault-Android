@@ -373,10 +373,15 @@ class TrustVaultAutofillService : AutofillService() {
     /**
      * Finds credentials matching the given package name or web domain.
      *
-     * Matching strategy:
-     * 1. Exact package name match
-     * 2. Website domain match (for web apps)
-     * 3. Fuzzy website match (subdomain)
+     * **Matching Strategy**:
+     * 1. Exact package name match (highest priority for apps)
+     * 2. URL/domain matching (for web apps and browsers):
+     *    - Primary website domain
+     *    - Allowed domains (user-configured overrides)
+     *    - Wildcard patterns (*.example.com)
+     *    - Subdomain matching
+     *
+     * **Domain Matching** uses UrlMatcher utility for consistent behavior
      */
     private suspend fun findMatchingCredentials(
         packageName: String,
@@ -385,31 +390,15 @@ class TrustVaultAutofillService : AutofillService() {
         // Get all credentials (from encrypted database)
         val allCredentials = credentialRepository.getAllCredentials().first()
 
-        // Filter by package name or website
+        // Filter by package name or website using UrlMatcher
         val matchingCredentials = allCredentials.filter { credential ->
-            // Exact package name match
-            if (credential.packageName.isNotEmpty() && credential.packageName == packageName) {
-                return@filter true
-            }
-
-            // Website domain match
-            if (webDomain != null && credential.website.isNotEmpty()) {
-                // Extract domain from credential website
-                val credentialDomain = extractDomain(credential.website)
-                val requestDomain = extractDomain(webDomain)
-
-                if (credentialDomain == requestDomain) {
-                    return@filter true
-                }
-
-                // Fuzzy match: Check if domains share common root
-                // e.g., "login.example.com" matches "example.com"
-                if (credentialDomain.contains(requestDomain) || requestDomain.contains(credentialDomain)) {
-                    return@filter true
-                }
-            }
-
-            false
+            UrlMatcher.isMatch(
+                credentialPackageName = credential.packageName,
+                credentialWebsite = credential.website,
+                allowedDomains = credential.allowedDomains,
+                requestPackageName = packageName,
+                requestUrl = webDomain
+            )
         }
 
         // Limit number of suggestions
