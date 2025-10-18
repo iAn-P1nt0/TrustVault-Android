@@ -30,7 +30,8 @@ class CredentialManagerFacadeTest {
         context = mockk(relaxed = true)
         credentialRepository = mockk(relaxed = true)
         val passkeyManager = mockk<PasskeyManager>(relaxed = true)
-        facade = CredentialManagerFacade(context, credentialRepository, passkeyManager)
+        val databaseKeyManager = mockk<com.trustvault.android.security.DatabaseKeyManager>(relaxed = true)
+        facade = CredentialManagerFacade(context, credentialRepository, passkeyManager, databaseKeyManager)
     }
 
     @Test

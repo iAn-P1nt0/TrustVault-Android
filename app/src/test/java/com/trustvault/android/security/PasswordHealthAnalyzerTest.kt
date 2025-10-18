@@ -45,7 +45,7 @@ class PasswordHealthAnalyzerTest {
 
     @Test
     fun testVeryStrongPassword() {
-        val result = analyzer.analyzePassword("x7K#mP2$qL9@nR5&vT8!wU3%yZ")
+        val result = analyzer.analyzePassword("x7K#mP2\$qL9@nR5&vT8!wU3%yZ")
         assertTrue(result.score >= 70)
         assertEquals(PasswordHealthAnalyzer.StrengthLevel.VERY_STRONG, result.strengthLevel)
     }
@@ -110,7 +110,7 @@ class PasswordHealthAnalyzerTest {
     @Test
     fun testCrackTime() {
         val weak = analyzer.analyzePassword("weak")
-        val strong = analyzer.analyzePassword("x7K#mP2$qL9@nR5&vT8!wU3%yZ")
+        val strong = analyzer.analyzePassword("x7K#mP2\$qL9@nR5&vT8!wU3%yZ")
 
         assertTrue(weak.crackTimeYears < strong.crackTimeYears)
     }
@@ -132,7 +132,7 @@ class PasswordHealthAnalyzerTest {
     @Test
     fun testScoreBounds() {
         val veryWeak = analyzer.analyzePassword("")
-        val veryStrong = analyzer.analyzePassword("x7K#mP2$qL9@nR5&vT8!wU3%yZaB4cD5")
+        val veryStrong = analyzer.analyzePassword("x7K#mP2\$qL9@nR5&vT8!wU3%yZaB4cD5")
 
         assertTrue(veryWeak.score >= 0)
         assertTrue(veryWeak.score <= 100)

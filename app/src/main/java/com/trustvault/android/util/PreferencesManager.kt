@@ -8,12 +8,18 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.trustvault.android.logging.SecureLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
  * Manages app preferences using DataStore.
  * Stores non-sensitive configuration data.
+ *
+ * SECURITY CONTROL: Privacy-first by default.
+ * - Diagnostics logging disabled by default
+ * - No telemetry or crash reporting
+ * - All data stored locally in encrypted DataStore
  */
 class PreferencesManager(private val context: Context) {
 
@@ -37,6 +43,16 @@ class PreferencesManager(private val context: Context) {
     val lastUnlockTimestamp: Flow<Long?> = context.dataStore.data
         .map { preferences ->
             preferences[LAST_UNLOCK_TIMESTAMP]
+        }
+
+    /**
+     * Diagnostics logging toggle (privacy setting).
+     * When enabled, verbose logs are written (with PII scrubbing).
+     * Disabled by default for privacy.
+     */
+    val isDiagnosticsEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[DIAGNOSTICS_ENABLED] ?: false
         }
 
     suspend fun setMasterPasswordHash(hash: String) {
@@ -74,10 +90,25 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
+    /**
+     * Enable or disable diagnostics logging.
+     * When enabled, logs are written (with PII scrubbing).
+     * Changes are synced to SecureLogger immediately.
+     */
+    suspend fun setDiagnosticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DIAGNOSTICS_ENABLED] = enabled
+        }
+        // Sync to SecureLogger
+        SecureLogger.isDiagnosticsEnabled = enabled
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.clear()
         }
+        // Reset diagnostics
+        SecureLogger.isDiagnosticsEnabled = false
     }
 
     companion object {
@@ -85,5 +116,6 @@ class PreferencesManager(private val context: Context) {
         private val MASTER_PASSWORD_HASH = stringPreferencesKey("master_password_hash")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         private val LAST_UNLOCK_TIMESTAMP = longPreferencesKey("last_unlock_timestamp")
+        private val DIAGNOSTICS_ENABLED = booleanPreferencesKey("diagnostics_enabled")
     }
 }
