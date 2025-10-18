@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:gravity="center_vertical">
+
+    <!-- Lock icon for security indication -->
+    <ImageView
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@android:drawable/ic_dialog_info"
+        android:contentDescription="@string/autofill_2fa_icon_content_desc"
+        android:scaleType="centerInside"
+        android:layout_marginEnd="12dp"
+        android:tint="#1F51BA" />
+
+    <!-- Main content area -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Label -->
+        <TextView
+            android:id="@+id/autofill_2fa_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/autofill_2fa_label"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#1F1F1F" />
+
+        <!-- Code display -->
+        <TextView
+            android:id="@+id/autofill_2fa_code"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="000000"
+            android:textSize="16sp"
+            android:fontFamily="monospace"
+            android:textColor="#1F51BA"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -88,4 +88,9 @@
     <!-- Security -->
     <string name="security_notice">Your data is encrypted with hardware-backed keys</string>
     <string name="zero_telemetry">Zero telemetry - Your data never leaves your device</string>
+
+    <!-- Autofill TOTP/2FA -->
+    <string name="autofill_2fa_label">2FA Code</string>
+    <string name="autofill_2fa_icon_content_desc">Two-factor authentication code</string>
+    <string name="autofill_2fa_hint">Auto-fill 2FA code</string>
 </resources>

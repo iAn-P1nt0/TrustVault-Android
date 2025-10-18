@@ -11,6 +11,7 @@ import com.trustvault.android.R
 import com.trustvault.android.TrustVaultApplication
 import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.security.DatabaseKeyManager
+import com.trustvault.android.security.OtpFieldDetector
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -222,6 +223,9 @@ class TrustVaultAutofillService : AutofillService() {
                         if (webDomain == null) webDomain = field.webDomain
                     }
                     AutofillFieldType.PASSWORD -> password = value
+                    AutofillFieldType.OTP -> {
+                        // OTP fields are not saved during save request
+                    }
                 }
             }
         }
@@ -345,7 +349,7 @@ class TrustVaultAutofillService : AutofillService() {
     }
 
     /**
-     * Determines if autofill hints indicate a username or password field.
+     * Determines if autofill hints indicate a username, password, or OTP field.
      */
     private fun determineFieldType(hints: Array<String>): AutofillFieldType? {
         return when {
@@ -355,6 +359,12 @@ class TrustVaultAutofillService : AutofillService() {
             }
             hints.any { it == android.view.View.AUTOFILL_HINT_PASSWORD } -> {
                 AutofillFieldType.PASSWORD
+            }
+            // Check for OTP hint (requires Android API 30+)
+            hints.any { hint ->
+                OtpFieldDetector.isOtpHint(arrayOf(hint))
+            } -> {
+                AutofillFieldType.OTP
             }
             else -> null
         }
@@ -434,17 +444,18 @@ class TrustVaultAutofillService : AutofillService() {
     ): FillResponse {
         val responseBuilder = FillResponse.Builder()
 
-        // Find username and password field IDs
+        // Find username, password, and OTP field IDs
         val usernameField = fields.firstOrNull { it.fieldType == AutofillFieldType.USERNAME }
         val passwordField = fields.firstOrNull { it.fieldType == AutofillFieldType.PASSWORD }
+        val otpField = fields.firstOrNull { it.fieldType == AutofillFieldType.OTP }
 
-        if (usernameField == null && passwordField == null) {
-            Log.w(TAG, "No username or password fields found")
+        if (usernameField == null && passwordField == null && otpField == null) {
+            Log.w(TAG, "No autofillable fields found")
         }
 
         // Create a dataset for each credential
         credentials.forEach { credential ->
-            val dataset = buildDataset(credential, usernameField, passwordField)
+            val dataset = buildDataset(credential, usernameField, passwordField, otpField)
             responseBuilder.addDataset(dataset)
         }
 
@@ -458,7 +469,8 @@ class TrustVaultAutofillService : AutofillService() {
     private fun buildDataset(
         credential: Credential,
         usernameField: AutofillField?,
-        passwordField: AutofillField?
+        passwordField: AutofillField?,
+        otpField: AutofillField?
     ): Dataset {
         val datasetBuilder = Dataset.Builder()
 
@@ -491,6 +503,31 @@ class TrustVaultAutofillService : AutofillService() {
             )
         }
 
+        // Set autofill values for OTP field (if credential has OTP secret)
+        if (otpField != null && credential.otpSecret != null) {
+            try {
+                val otpHelper = OtpAutofillHelper()
+                val otpCode = otpHelper.generateOtpCode(credential)
+
+                if (otpCode.isNotEmpty() && otpHelper.isOtpCodeValid(credential)) {
+                    val otpPresentation = RemoteViews(packageName, R.layout.autofill_2fa_item)
+                    otpPresentation.setTextViewText(R.id.autofill_2fa_label, "2FA Code")
+                    otpPresentation.setTextViewText(R.id.autofill_2fa_code, otpCode)
+
+                    datasetBuilder.setValue(
+                        otpField.autofillId,
+                        AutofillValue.forText(otpCode),
+                        otpPresentation
+                    )
+                    Log.d(TAG, "Added OTP dataset for credential: ${credential.title}")
+                } else {
+                    Log.d(TAG, "OTP code not available or expired for: ${credential.title}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error generating OTP code: ${e.message}")
+            }
+        }
+
         return datasetBuilder.build()
     }
 }
@@ -510,7 +547,8 @@ data class AutofillField(
  */
 enum class AutofillFieldType {
     USERNAME,
-    PASSWORD
+    PASSWORD,
+    OTP  // Two-factor authentication code
 }
 
 /**
