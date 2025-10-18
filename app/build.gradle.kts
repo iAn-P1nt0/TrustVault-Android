@@ -140,6 +140,10 @@ dependencies {
     // Accompanist Permissions (for Compose permission handling)
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 
+    // Import/Export - CSV and KDBX support
+    implementation("org.apache.commons:commons-csv:1.10.0")  // CSV parsing
+    implementation("com.google.code.gson:gson:2.10.1")       // JSON serialization for backups
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
