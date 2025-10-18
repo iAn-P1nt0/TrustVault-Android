@@ -4,9 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,7 +58,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val mainViewModel: MainViewModel = hiltViewModel()
-                    val isMasterPasswordSet by mainViewModel.isMasterPasswordSet.collectAsState(initial = false)
+                    // Wait for the Flow to emit value - don't use initial = false
+                    // This prevents showing Setup screen when preferences are still loading
+                    val isMasterPasswordSet by mainViewModel.isMasterPasswordSet.collectAsState(initial = null)
                     val currentBackStack by navController.currentBackStackEntryAsState()
                     val currentRoute = currentBackStack?.destination?.route
 
@@ -91,16 +96,47 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    val startDestination = if (isMasterPasswordSet) {
-                        Screen.Unlock.route
-                    } else {
-                        Screen.MasterPasswordSetup.route
+                    // Determine start destination
+                    // If preferences haven't loaded yet (null), show loading screen
+                    val startDestination = when (isMasterPasswordSet) {
+                        true -> Screen.Unlock.route
+                        false -> Screen.MasterPasswordSetup.route
+                        null -> Screen.LoadingScreen.route  // Wait for preferences to load
                     }
 
                     NavHost(
                         navController = navController,
                         startDestination = startDestination
                     ) {
+                        composable(Screen.LoadingScreen.route) {
+                            // Show loading while preferences are being loaded
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.background
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+
+                            // Auto-navigate once preferences are loaded
+                            LaunchedEffect(isMasterPasswordSet) {
+                                if (isMasterPasswordSet != null) {
+                                    val destination = if (isMasterPasswordSet == true) {
+                                        Screen.Unlock.route
+                                    } else {
+                                        Screen.MasterPasswordSetup.route
+                                    }
+                                    navController.navigate(destination) {
+                                        popUpTo(Screen.LoadingScreen.route) { inclusive = true }
+                                    }
+                                }
+                            }
+                        }
+
                         composable(Screen.MasterPasswordSetup.route) {
                             MasterPasswordSetupScreen(
                                 onPasswordCreated = {

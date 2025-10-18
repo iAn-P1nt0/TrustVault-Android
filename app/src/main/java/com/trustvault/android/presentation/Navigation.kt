@@ -4,6 +4,7 @@ package com.trustvault.android.presentation
  * Navigation routes for the app.
  */
 sealed class Screen(val route: String) {
+    object LoadingScreen : Screen("loading")
     object MasterPasswordSetup : Screen("master_password_setup")
     object Unlock : Screen("unlock")
     object CredentialList : Screen("credential_list")
