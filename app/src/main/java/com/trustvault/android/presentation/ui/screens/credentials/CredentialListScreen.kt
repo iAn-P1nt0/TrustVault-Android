@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +25,7 @@ import java.util.*
 fun CredentialListScreen(
     onAddCredential: () -> Unit,
     onCredentialClick: (Long) -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: CredentialListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -38,7 +40,7 @@ fun CredentialListScreen(
             TopAppBar(
                 title = { Text("TrustVault") },
                 actions = {
-                    IconButton(onClick = { /* Settings */ }) {
+                    IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 }
@@ -194,7 +196,7 @@ private fun getCategoryIcon(category: CredentialCategory): androidx.compose.ui.g
         CredentialCategory.LOGIN -> Icons.Filled.Person
         CredentialCategory.PAYMENT -> Icons.Filled.CreditCard
         CredentialCategory.IDENTITY -> Icons.Filled.Badge
-        CredentialCategory.NOTE -> Icons.Filled.Note
+        CredentialCategory.NOTE -> Icons.Filled.DocumentScanner
         CredentialCategory.OTHER -> Icons.Filled.Folder
     }
 }

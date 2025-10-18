@@ -31,6 +31,7 @@ import com.trustvault.android.presentation.ui.screens.credentials.AddEditCredent
 import com.trustvault.android.presentation.ui.screens.credentials.CredentialListScreen
 import com.trustvault.android.presentation.ui.screens.generator.PasswordGeneratorScreen
 import com.trustvault.android.presentation.ui.screens.ocr.OcrCaptureScreen
+import com.trustvault.android.presentation.ui.screens.settings.SettingsScreen
 import com.trustvault.android.presentation.ui.theme.TrustVaultTheme
 import com.trustvault.android.presentation.viewmodel.AddEditCredentialViewModel
 import com.trustvault.android.presentation.viewmodel.MainViewModel
@@ -164,6 +165,23 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onCredentialClick = { id ->
                                     navController.navigate(Screen.AddEditCredential.createRoute(id))
+                                },
+                                onSettingsClick = {
+                                    navController.navigate(Screen.Settings.route)
+                                }
+                            )
+                        }
+
+                        composable(Screen.Settings.route) {
+                            SettingsScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                },
+                                onLockApp = {
+                                    mainViewModel.lockDatabase()
+                                    navController.navigate(Screen.Unlock.route) {
+                                        popUpTo(Screen.CredentialList.route) { inclusive = true }
+                                    }
                                 }
                             )
                         }
