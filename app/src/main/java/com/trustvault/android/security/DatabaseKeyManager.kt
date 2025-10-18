@@ -164,8 +164,9 @@ class DatabaseKeyManager @Inject constructor(
             currentKey = databaseKey.clone()
 
             // Create SQLCipher support factory with passphrase
-            // clearPassphrase=true ensures SupportFactory clears the byte array after use
-            val factory = SupportFactory(passphraseBytes, null, true)
+            // clearPassphrase=false prevents SupportFactory from clearing passphrase
+            // This allows Room to re-open the database multiple times without error
+            val factory = SupportFactory(passphraseBytes, null, false)
 
             // Build and return Room database with encryption
             val database = Room.databaseBuilder(
@@ -280,7 +281,7 @@ class DatabaseKeyManager @Inject constructor(
                     chars.toSQLCipherBytes()
                 }
 
-                val factory = SupportFactory(passphraseBytes, null, true)
+                val factory = SupportFactory(passphraseBytes, null, false)
 
                 val testDb = Room.databaseBuilder(
                     context,
