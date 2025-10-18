@@ -13,6 +13,7 @@ import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialException
 import com.trustvault.android.domain.model.Credential
 import com.trustvault.android.domain.repository.CredentialRepository
+import com.trustvault.android.security.DatabaseKeyManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -50,7 +51,8 @@ import javax.inject.Singleton
 class CredentialManagerFacade @Inject constructor(
     @ApplicationContext private val context: Context,
     private val credentialRepository: CredentialRepository,
-    private val passkeyManager: PasskeyManager
+    private val passkeyManager: PasskeyManager,
+    private val databaseKeyManager: DatabaseKeyManager
 ) {
 
     private val credentialManager: CredentialManager by lazy {
@@ -175,6 +177,12 @@ class CredentialManagerFacade @Inject constructor(
         packageName: String,
         webDomain: String? = null
     ): List<Credential> {
+        // Check if database is initialized (user has authenticated)
+        if (!databaseKeyManager.isDatabaseInitialized()) {
+            Log.w(TAG, "Database not initialized - returning empty credentials")
+            return emptyList()
+        }
+
         val allCredentials = credentialRepository.getAllCredentials().first()
 
         return allCredentials.filter { credential ->
@@ -358,6 +366,12 @@ class CredentialManagerFacade @Inject constructor(
         packageName: String,
         webDomain: String?
     ) {
+        // Check if database is initialized (user has authenticated)
+        if (!databaseKeyManager.isDatabaseInitialized()) {
+            Log.w(TAG, "Database not initialized - cannot save credential")
+            return
+        }
+
         // Check if credential already exists
         val existing = credentialRepository.getAllCredentials().first()
             .find {

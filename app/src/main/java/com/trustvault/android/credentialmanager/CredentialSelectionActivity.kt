@@ -8,6 +8,7 @@ import androidx.credentials.GetCredentialResponse
 import androidx.credentials.PasswordCredential
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import com.trustvault.android.domain.repository.CredentialRepository
+import com.trustvault.android.security.DatabaseKeyManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,9 @@ class CredentialSelectionActivity : ComponentActivity() {
     @Inject
     lateinit var credentialRepository: CredentialRepository
 
+    @Inject
+    lateinit var databaseKeyManager: DatabaseKeyManager
+
     private val activityScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +51,14 @@ class CredentialSelectionActivity : ComponentActivity() {
     private fun handleCredentialSelection() {
         activityScope.launch {
             try {
+                // Check if database is initialized (user has authenticated)
+                if (!databaseKeyManager.isDatabaseInitialized()) {
+                    // Database not ready - user hasn't authenticated yet
+                    setResult(RESULT_CANCELED)
+                    finish()
+                    return@launch
+                }
+
                 val credentialId = intent.getLongExtra("credential_id", -1L)
 
                 if (credentialId == -1L) {
