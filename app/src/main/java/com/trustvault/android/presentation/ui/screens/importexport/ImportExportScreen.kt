@@ -1,5 +1,6 @@
 package com.trustvault.android.presentation.ui.screens.importexport
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trustvault.android.presentation.viewmodel.ImportExportViewModel
@@ -28,6 +30,23 @@ fun ImportExportScreen(
     viewModel: ImportExportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // State for export confirmation dialog
+    var showExportConfirmation by remember { mutableStateOf(false) }
+
+    // Export confirmation dialog
+    if (showExportConfirmation) {
+        ExportConfirmationDialog(
+            onConfirm = {
+                showExportConfirmation = false
+                viewModel.exportToCSV()
+            },
+            onDismiss = {
+                showExportConfirmation = false
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -62,7 +81,7 @@ fun ImportExportScreen(
                 title = "Export to CSV",
                 description = "Download all credentials as CSV file",
                 icon = Icons.Filled.FilePresent,
-                onClick = { viewModel.exportToCSV() },
+                onClick = { showExportConfirmation = true },
                 isLoading = uiState is ImportExportViewModel.UiState.Loading
             )
 
@@ -97,20 +116,27 @@ fun ImportExportScreen(
             )
 
             // Status Messages
-            when (uiState) {
+            when (val state = uiState) {
                 is ImportExportViewModel.UiState.Success -> {
                     Spacer(modifier = Modifier.height(8.dp))
-                    SucessMessageCard((uiState as ImportExportViewModel.UiState.Success).message)
+                    SucessMessageCard(state.message)
                 }
                 is ImportExportViewModel.UiState.Error -> {
                     Spacer(modifier = Modifier.height(8.dp))
-                    ErrorMessageCard((uiState as ImportExportViewModel.UiState.Error).message)
+                    ErrorMessageCard(state.message)
                 }
                 is ImportExportViewModel.UiState.ExportReady -> {
                     Spacer(modifier = Modifier.height(8.dp))
                     ExportReadyCard(
-                        fileName = (uiState as ImportExportViewModel.UiState.ExportReady).fileName,
-                        onDismiss = { viewModel.resetUiState() }
+                        fileName = state.fileName,
+                        fileUri = state.fileUri,
+                        onDismiss = { viewModel.resetUiState() },
+                        onShare = {
+                            state.fileUri?.let { uri ->
+                                val shareIntent = viewModel.getShareIntent(uri, state.fileName)
+                                context.startActivity(Intent.createChooser(shareIntent, "Share CSV Export"))
+                            }
+                        }
                     )
                 }
                 else -> {}
@@ -308,7 +334,12 @@ private fun ErrorMessageCard(message: String) {
 }
 
 @Composable
-private fun ExportReadyCard(fileName: String, onDismiss: () -> Unit) {
+private fun ExportReadyCard(
+    fileName: String,
+    fileUri: android.net.Uri?,
+    onDismiss: () -> Unit,
+    onShare: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -324,20 +355,84 @@ private fun ExportReadyCard(fileName: String, onDismiss: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    Icons.Filled.Download,
+                    Icons.Filled.CheckCircle,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onTertiaryContainer
                 )
-                Text(
-                    "Export ready: $fileName",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column {
+                    Text(
+                        "Export Complete!",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Text(
+                        fileName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                    )
+                }
             }
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.End)
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                "Your credentials have been exported to a CSV file. You can now share it or save it to your device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.9f)
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.3f)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("OK")
+                // Share button
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f),
+                    enabled = fileUri != null
+                ) {
+                    Icon(
+                        Icons.Filled.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Share")
+                }
+
+                // Done button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Done")
+                }
+            }
+
+            // Security warning
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    "⚠️ Warning: CSV exports are unencrypted. Handle with care and delete after use.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
@@ -349,5 +444,92 @@ private fun InfoItem(text: String) {
         text,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(start = 0.dp, top = 4.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun ExportConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Filled.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text("Export to CSV?")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "You are about to export all your credentials to an unencrypted CSV file.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                Icons.Filled.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                "Security Warning",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Text(
+                            "• CSV files are NOT encrypted\n" +
+                            "• Your passwords will be visible in plain text\n" +
+                            "• Anyone with access to the file can read your credentials\n" +
+                            "• Delete the file after use",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                Text(
+                    "Only proceed if you understand the security risks and need to transfer credentials to another password manager.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Export Anyway")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
     )
 }

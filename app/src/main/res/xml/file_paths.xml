@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      FileProvider paths configuration for TrustVault exports
+
+      Security:
+      - Only allows sharing files from cache/exports directory
+      - Files are temporary and should be deleted after share
+      - No access to other app directories
+    -->
+    <cache-path
+        name="exports"
+        path="exports/" />
+</paths>
