@@ -117,6 +117,21 @@ class BackupManager @Inject constructor(
         return try {
             Log.d(TAG, "Starting backup restore from: ${backupFile.name}")
 
+            // SECURITY CONTROL: Validate backup file structure before processing
+            when (val validationResult = BackupFileValidator.validateBackupFile(backupFile)) {
+                is BackupFileValidator.ValidationResult.Valid -> {
+                    Log.d(TAG, "Backup file validation passed")
+                }
+                is BackupFileValidator.ValidationResult.Invalid -> {
+                    Log.e(TAG, "Backup file validation failed: ${validationResult.reason}")
+                    return Result.failure(
+                        IllegalArgumentException(
+                            "Invalid backup file: ${validationResult.reason}. ${validationResult.details}"
+                        )
+                    )
+                }
+            }
+
             // Read backup file
             val backupFileData = readBackupFile(backupFile)
                 ?: return Result.failure(Exception("Failed to read backup file"))
@@ -170,7 +185,7 @@ class BackupManager @Inject constructor(
     /**
      * Lists all available backups.
      *
-     * @return List of backup files with metadata
+     * @return List of backup files with metadata (only valid backups)
      */
     fun listBackups(): List<BackupInfo> {
         return try {
@@ -178,15 +193,27 @@ class BackupManager @Inject constructor(
                 file.isFile && file.name.endsWith(BACKUP_FILE_EXTENSION)
             }?.mapNotNull { file ->
                 try {
-                    val metadata = readBackupMetadata(file)
-                    if (metadata != null) {
-                        BackupInfo(
-                            file = file,
-                            metadata = metadata
-                        )
-                    } else null
+                    // SECURITY CONTROL: Validate backup file before listing
+                    when (val validationResult = BackupFileValidator.validateBackupFile(file)) {
+                        is BackupFileValidator.ValidationResult.Valid -> {
+                            val metadata = readBackupMetadata(file)
+                            if (metadata != null) {
+                                BackupInfo(
+                                    file = file,
+                                    metadata = metadata
+                                )
+                            } else {
+                                Log.w(TAG, "Failed to read metadata from ${file.name}")
+                                null
+                            }
+                        }
+                        is BackupFileValidator.ValidationResult.Invalid -> {
+                            Log.w(TAG, "Skipping invalid backup ${file.name}: ${validationResult.reason}")
+                            null
+                        }
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to read metadata from ${file.name}: ${e.message}")
+                    Log.w(TAG, "Failed to process backup ${file.name}: ${e.message}")
                     null
                 }
             }?.sortedByDescending { it.metadata.timestamp } ?: emptyList()
