@@ -13,9 +13,20 @@ class PasswordHasher @Inject constructor() {
 
     /**
      * Pluggable engine to allow replacing Argon2 implementation in tests.
+     *
+     * OWASP 2025 Parameters:
+     * - tCostInIterations: 3 (number of iterations)
+     * - mCostInKibibyte: 65536 (64 MB memory cost)
+     * - parallelism: 4 (number of parallel threads)
      */
     internal interface Engine {
-        fun hash(password: ByteArray, salt: ByteArray, tCostInIterations: Int, mCostInKibibyte: Int): String
+        fun hash(
+            password: ByteArray,
+            salt: ByteArray,
+            tCostInIterations: Int,
+            mCostInKibibyte: Int,
+            parallelism: Int = PARALLELISM
+        ): String
         fun verify(password: ByteArray, encoded: String): Boolean
     }
 
@@ -38,8 +49,14 @@ class PasswordHasher @Inject constructor() {
     }
 
     /**
-     * Hashes a password using Argon2id algorithm.
+     * Hashes a password using Argon2id algorithm with OWASP 2025 parameters.
      * Returns the hash as a String that can be stored.
+     *
+     * **OWASP 2025 Argon2id Parameters:**
+     * - Memory: 64 MB (65536 KiB)
+     * - Iterations: 3
+     * - Parallelism: 4 threads
+     * - Salt: 16 bytes (cryptographically random)
      *
      * SECURITY: Accepts CharArray for secure memory handling. The CharArray
      * should be wiped by the caller after this method returns.
@@ -56,7 +73,8 @@ class PasswordHasher @Inject constructor() {
                 password = passwordBytes,
                 salt = generateSalt(),
                 tCostInIterations = T_COST,
-                mCostInKibibyte = M_COST
+                mCostInKibibyte = M_COST,
+                parallelism = PARALLELISM
             )
             return hashEncoded
         } finally {
@@ -122,8 +140,11 @@ class PasswordHasher @Inject constructor() {
     }
 
     companion object {
+        // OWASP 2025 Argon2id Parameters
+        // Reference: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
         private const val T_COST = 3 // Number of iterations
         private const val M_COST = 65536 // Memory cost in KiB (64 MB)
+        private const val PARALLELISM = 4 // Parallel threads
         private const val SALT_LENGTH = 16 // Salt length in bytes
     }
 }

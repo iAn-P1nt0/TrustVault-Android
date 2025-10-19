@@ -12,7 +12,13 @@ class PasswordHasherTest {
 
     // Simple fake engine that encodes as FAKE|hex(salt)|hex(sha256(password))
     private class FakeEngine : PasswordHasher.Engine {
-        override fun hash(password: ByteArray, salt: ByteArray, tCostInIterations: Int, mCostInKibibyte: Int): String {
+        override fun hash(
+            password: ByteArray,
+            salt: ByteArray,
+            tCostInIterations: Int,
+            mCostInKibibyte: Int,
+            parallelism: Int
+        ): String {
             val pwdHash = sha256(password)
             return "FAKE|${salt.toHex()}|${pwdHash.toHex()}"
         }
