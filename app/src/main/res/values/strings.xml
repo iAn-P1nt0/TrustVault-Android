@@ -93,4 +93,38 @@
     <string name="autofill_2fa_label">2FA Code</string>
     <string name="autofill_2fa_icon_content_desc">Two-factor authentication code</string>
     <string name="autofill_2fa_hint">Auto-fill 2FA code</string>
+
+    <!-- Biometric Authentication -->
+    <string name="biometric_setup_title">Enable Biometric Unlock?</string>
+    <string name="biometric_setup_message">Unlock your vault quickly and securely with your fingerprint or face.</string>
+    <string name="biometric_setup_security_note">Your master password will be encrypted and stored securely in Android Keystore.</string>
+    <string name="biometric_enable">Enable Biometric Unlock</string>
+    <string name="biometric_not_now">Not Now</string>
+    <string name="biometric_never_ask">Never Ask Again</string>
+    <string name="biometric_invalidated_title">Biometric Changed</string>
+    <string name="biometric_invalidated_message">Your biometrics have changed. For security, biometric unlock has been disabled. You can re-enable it in Settings.</string>
+    <string name="biometric_reenable_settings">Re-enable in Settings</string>
+    <string name="biometric_dismiss">Dismiss</string>
+    <string name="biometric_unlock_label">Biometric Unlock</string>
+    <string name="biometric_enabled_status">Enabled</string>
+    <string name="biometric_disabled_status">Disabled</string>
+    <string name="biometric_none_enrolled_status">No biometrics enrolled</string>
+    <string name="biometric_not_available_status">Not available on this device</string>
+    <string name="biometric_description">Unlock your vault with fingerprint or face recognition. Your master password is encrypted and stored securely in Android Keystore.</string>
+    <string name="biometric_enter_password">Enter Master Password</string>
+    <string name="biometric_enter_password_message">Enter your master password to enable biometric unlock.</string>
+    <string name="biometric_disable_title">Disable Biometric Unlock?</string>
+    <string name="biometric_disable_message">You\'ll need to enter your master password to unlock your vault.</string>
+    <string name="biometric_disable_confirm">Disable</string>
+    <string name="biometric_enabled_success">Biometric unlock enabled successfully</string>
+    <string name="biometric_disabled_success">Biometric unlock disabled</string>
+
+    <!-- Biometric Error Messages -->
+    <string name="biometric_error_hw_unavailable">Biometric hardware is temporarily unavailable</string>
+    <string name="biometric_error_none_enrolled_detail">Add fingerprint or face in device Settings to use biometric unlock.</string>
+    <string name="biometric_error_no_hardware_detail">This device doesn\'t support biometric authentication.</string>
+    <string name="biometric_error_lockout">Too many failed attempts. Try again later</string>
+    <string name="biometric_error_lockout_permanent">Biometric locked. Use password to unlock</string>
+    <string name="biometric_error_security_update">A security update is required for biometric authentication.</string>
+    <string name="biometric_error_not_available">Biometric authentication is not available</string>
 </resources>

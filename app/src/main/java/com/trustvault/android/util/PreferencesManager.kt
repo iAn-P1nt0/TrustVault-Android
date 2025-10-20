@@ -40,9 +40,23 @@ class PreferencesManager(private val context: Context) {
             preferences[BIOMETRIC_ENABLED] ?: false
         }
 
+    val biometricNeverAskAgain: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[NEVER_ASK_BIOMETRIC_SETUP] ?: false
+        }
+
     val lastUnlockTimestamp: Flow<Long?> = context.dataStore.data
         .map { preferences ->
             preferences[LAST_UNLOCK_TIMESTAMP]
+        }
+
+    /**
+     * Never ask to enable biometric unlock again.
+     * Set when user clicks "Never Ask Again" on biometric setup dialog.
+     */
+    val neverAskBiometricSetup: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[NEVER_ASK_BIOMETRIC_SETUP] ?: false
         }
 
     /**
@@ -65,6 +79,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setBiometricEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[BIOMETRIC_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setBiometricNeverAskAgain(neverAsk: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NEVER_ASK_BIOMETRIC_SETUP] = neverAsk
         }
     }
 
@@ -103,6 +123,16 @@ class PreferencesManager(private val context: Context) {
         SecureLogger.isDiagnosticsEnabled = enabled
     }
 
+    /**
+     * Sets the "never ask biometric setup again" preference.
+     * Called when user clicks "Never Ask Again" on biometric setup dialog.
+     */
+    suspend fun setNeverAskBiometricSetup(neverAsk: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NEVER_ASK_BIOMETRIC_SETUP] = neverAsk
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.clear()
@@ -116,6 +146,7 @@ class PreferencesManager(private val context: Context) {
         private val MASTER_PASSWORD_HASH = stringPreferencesKey("master_password_hash")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         private val LAST_UNLOCK_TIMESTAMP = longPreferencesKey("last_unlock_timestamp")
+        private val NEVER_ASK_BIOMETRIC_SETUP = booleanPreferencesKey("never_ask_biometric_setup")
         private val DIAGNOSTICS_ENABLED = booleanPreferencesKey("diagnostics_enabled")
     }
 }

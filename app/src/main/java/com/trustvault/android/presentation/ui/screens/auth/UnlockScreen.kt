@@ -18,15 +18,21 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trustvault.android.presentation.ui.components.BiometricInvalidatedDialog
+import com.trustvault.android.presentation.ui.components.BiometricSetupDialog
+import com.trustvault.android.presentation.viewmodel.BiometricViewModel
 import com.trustvault.android.presentation.viewmodel.UnlockViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnlockScreen(
     onUnlocked: () -> Unit,
-    viewModel: UnlockViewModel = hiltViewModel()
+    onNavigateToSettings: () -> Unit = {},
+    viewModel: UnlockViewModel = hiltViewModel(),
+    biometricViewModel: BiometricViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val biometricUiState by biometricViewModel.uiState.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -39,6 +45,48 @@ fun UnlockScreen(
                 viewModel.showBiometricPrompt(activity, onUnlocked)
             }
         }
+    }
+
+    // Show biometric setup dialog after successful password unlock
+    if (uiState.shouldOfferBiometricSetup) {
+        BiometricSetupDialog(
+            onEnableClick = {
+                val activity = context as? FragmentActivity
+                val masterPassword = uiState.lastMasterPassword
+                if (activity != null && masterPassword != null) {
+                    biometricViewModel.setupBiometricUnlock(
+                        activity = activity,
+                        masterPassword = masterPassword,
+                        onSuccess = {
+                            viewModel.clearLastMasterPassword()
+                        }
+                    )
+                }
+            },
+            onNotNowClick = {
+                viewModel.clearLastMasterPassword()
+            },
+            onNeverAskClick = {
+                biometricViewModel.setNeverAskAgain()
+                viewModel.clearLastMasterPassword()
+            },
+            onDismiss = {
+                viewModel.clearLastMasterPassword()
+            }
+        )
+    }
+
+    // Show biometric invalidated dialog
+    if (uiState.showBiometricInvalidatedDialog) {
+        BiometricInvalidatedDialog(
+            onReEnable = {
+                viewModel.dismissBiometricInvalidatedDialog()
+                onNavigateToSettings()
+            },
+            onDismiss = {
+                viewModel.dismissBiometricInvalidatedDialog()
+            }
+        )
     }
 
     Scaffold(

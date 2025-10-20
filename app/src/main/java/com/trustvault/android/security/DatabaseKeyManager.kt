@@ -128,6 +128,57 @@ class DatabaseKeyManager @Inject constructor(
     }
 
     /**
+     * Initializes the database with the Master Encryption Key (MEK) from biometric unlock.
+     * This method is called when unlocking with biometrics, where the MEK is retrieved
+     * directly from the Android Keystore without needing the master password.
+     *
+     * SECURITY: The MEK ByteArray should be wiped by the caller after this method returns.
+     *
+     * @param mek The Master Encryption Key as ByteArray (from biometric unlock)
+     * @return The initialized database instance
+     */
+    @Synchronized
+    fun initializeWithMEK(mek: ByteArray): TrustVaultDatabase {
+        // If database is already initialized, return it
+        currentDatabase?.let { return it }
+
+        // Get or create the wrapped database key (unwrapped to plaintext in memory)
+        val databaseKey = getOrCreateWrappedDatabaseKey()
+
+        try {
+            // Convert key to SQLCipher passphrase format
+            val passphraseChars = String(databaseKey, Charsets.UTF_8).toCharArray()
+
+            val passphraseBytes = passphraseChars.use { chars ->
+                chars.toSQLCipherBytes()
+            }
+
+            // Store a copy of the key for session management
+            currentKey = databaseKey.clone()
+
+            // Create SQLCipher support factory with passphrase
+            val factory = SupportFactory(passphraseBytes, null, false)
+
+            // Build and return Room database with encryption
+            val database = Room.databaseBuilder(
+                context,
+                TrustVaultDatabase::class.java,
+                "trustvault_database"
+            )
+                .openHelperFactory(factory)
+                .fallbackToDestructiveMigration()
+                .build()
+
+            currentDatabase = database
+
+            return database
+        } finally {
+            // SECURITY CONTROL: Clear database key from memory
+            databaseKey.secureWipe()
+        }
+    }
+
+    /**
      * Initializes the database with Keystore-wrapped encryption key.
      * This should be called after successful authentication.
      *

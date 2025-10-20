@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.trustvault.android.presentation.ui.components.BiometricSettingsSection
 
 /**
  * Settings screen for app configuration.
@@ -49,6 +50,11 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            // Biometric Settings Section
+            BiometricSettingsSection()
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // Lock App Button
             Card(
                 modifier = Modifier

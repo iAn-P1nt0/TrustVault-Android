@@ -3,10 +3,10 @@ package com.trustvault.android.presentation.viewmodel
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trustvault.android.security.BiometricAuthManager
-import com.trustvault.android.security.BiometricStatus
 import com.trustvault.android.security.DatabaseKeyManager
 import com.trustvault.android.security.PasswordHasher
+import com.trustvault.android.security.biometric.BiometricVaultUnlocker
+import com.trustvault.android.security.zeroknowledge.MasterKeyHierarchy
 import com.trustvault.android.util.PreferencesManager
 import com.trustvault.android.util.secureWipe
 import com.trustvault.android.util.toSecureCharArray
@@ -22,9 +22,9 @@ import javax.inject.Inject
 class UnlockViewModel @Inject constructor(
     private val passwordHasher: PasswordHasher,
     private val preferencesManager: PreferencesManager,
-    private val biometricAuthManager: BiometricAuthManager,
     private val databaseKeyManager: DatabaseKeyManager,
-    private val biometricPasswordStorage: com.trustvault.android.security.BiometricPasswordStorage
+    private val biometricVaultUnlocker: BiometricVaultUnlocker,
+    private val masterKeyHierarchy: MasterKeyHierarchy
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UnlockUiState())
@@ -32,46 +32,74 @@ class UnlockViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val isBiometricEnabled = preferencesManager.isBiometricEnabled.first()
-            val biometricStatus = biometricAuthManager.isBiometricAvailable()
-            val shouldShowBiometric = biometricStatus == BiometricStatus.AVAILABLE && isBiometricEnabled
+            val isAvailable = biometricVaultUnlocker.isBiometricUnlockAvailable()
 
             _uiState.value = _uiState.value.copy(
-                isBiometricAvailable = shouldShowBiometric,
-                shouldShowBiometricPromptOnLaunch = shouldShowBiometric
+                isBiometricAvailable = isAvailable,
+                shouldShowBiometricPromptOnLaunch = isAvailable
             )
         }
     }
 
     /**
-     * Shows biometric prompt for authentication.
+     * Shows biometric prompt for authentication using BiometricVaultUnlocker.
      * This is the primary unlock method when biometrics are available.
      *
      * @param activity FragmentActivity context required for BiometricPrompt
      * @param onSuccess Callback when authentication succeeds
      */
     fun showBiometricPrompt(activity: FragmentActivity, onSuccess: () -> Unit) {
-        biometricAuthManager.authenticate(
-            activity = activity,
-            onSuccess = {
-                // Biometric authentication succeeded
-                unlockWithBiometric(onSuccess)
-            },
-            onError = { errorMessage ->
-                // Authentication error (hardware failure, etc.)
-                _uiState.value = _uiState.value.copy(
-                    error = errorMessage,
-                    shouldShowBiometricPromptOnLaunch = false
-                )
-            },
-            onUserCancelled = {
-                // User cancelled - allow password input
-                _uiState.value = _uiState.value.copy(
-                    shouldShowBiometricPromptOnLaunch = false,
-                    error = null
-                )
-            }
-        )
+        viewModelScope.launch {
+            biometricVaultUnlocker.unlockWithBiometric(
+                activity = activity,
+                onSuccess = { mek ->
+                    viewModelScope.launch {
+                        try {
+                            // Initialize database with MEK
+                            databaseKeyManager.initializeWithMEK(mek)
+
+                            // Record unlock timestamp for auto-lock timeout
+                            preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
+
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                shouldShowBiometricPromptOnLaunch = false
+                            )
+                            onSuccess()
+                        } finally {
+                            // SECURITY CRITICAL: Wipe MEK from memory
+                            mek.secureWipe()
+                        }
+                    }
+                },
+                onError = { errorMessage ->
+                    // Authentication error (hardware failure, etc.)
+                    _uiState.value = _uiState.value.copy(
+                        error = errorMessage,
+                        shouldShowBiometricPromptOnLaunch = false,
+                        isLoading = false
+                    )
+                },
+                onUserCancelled = {
+                    // User cancelled - allow password input
+                    _uiState.value = _uiState.value.copy(
+                        shouldShowBiometricPromptOnLaunch = false,
+                        error = null,
+                        isLoading = false
+                    )
+                },
+                onBiometricInvalidated = {
+                    // Biometric key invalidated - show alert
+                    _uiState.value = _uiState.value.copy(
+                        error = "Your biometrics have changed. Biometric unlock has been disabled for security. Please re-enable in Settings.",
+                        shouldShowBiometricPromptOnLaunch = false,
+                        isBiometricAvailable = false,
+                        isLoading = false,
+                        showBiometricInvalidatedDialog = true
+                    )
+                }
+            )
+        }
     }
 
     fun onPasswordChange(password: String) {
@@ -102,14 +130,28 @@ class UnlockViewModel @Inject constructor(
 
                 if (isValid) {
                     // SECURITY: Initialize database with derived encryption key
-                    // The database key is now derived from the authenticated master password
-                    databaseKeyManager.initializeDatabase(passwordChars)
+                    val mek = masterKeyHierarchy.deriveMasterEncryptionKey(passwordChars)
+                    try {
+                        databaseKeyManager.initializeWithMEK(mek)
 
-                    // Record unlock timestamp for auto-lock timeout
-                    preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
+                        // Record unlock timestamp for auto-lock timeout
+                        preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
 
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                    onSuccess()
+                        // Check if we should offer biometric setup
+                        val isBiometricEnabled = preferencesManager.isBiometricEnabled.first()
+                        val neverAskAgain = preferencesManager.biometricNeverAskAgain.first()
+
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            shouldOfferBiometricSetup = !isBiometricEnabled && !neverAskAgain,
+                            lastMasterPassword = passwordChars // Store for biometric setup
+                        )
+
+                        onSuccess()
+                    } finally {
+                        // SECURITY: Wipe MEK from memory
+                        mek.secureWipe()
+                    }
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -122,61 +164,21 @@ class UnlockViewModel @Inject constructor(
                     error = "Authentication failed: ${e.message}"
                 )
             } finally {
-                // SECURITY CONTROL: Clear password from memory
-                passwordChars.secureWipe()
+                // Note: Don't wipe passwordChars here if we need it for biometric setup
+                if (!_uiState.value.shouldOfferBiometricSetup) {
+                    passwordChars.secureWipe()
+                }
             }
         }
     }
 
-    /**
-     * Unlocks the app using biometric authentication.
-     *
-     * SECURITY FIX: This method now properly initializes the database
-     * with the stored master password after successful biometric authentication.
-     *
-     * The master password is stored encrypted in EncryptedSharedPreferences
-     * when the user enables biometric authentication.
-     */
-    fun unlockWithBiometric(onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value.copy(isLoading = true)
+    fun dismissBiometricInvalidatedDialog() {
+        _uiState.value = _uiState.value.copy(showBiometricInvalidatedDialog = false)
+    }
 
-                // Retrieve encrypted master password
-                val storedPassword = biometricPasswordStorage.getPassword()
-
-                if (storedPassword == null) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Biometric password not found. Please unlock with password."
-                    )
-                    return@launch
-                }
-
-                // SECURITY: Convert password to CharArray for secure memory handling
-                val passwordChars = storedPassword.toSecureCharArray()
-
-                try {
-                    // SECURITY: Initialize database with derived encryption key
-                    // The database key is derived from the stored master password
-                    databaseKeyManager.initializeDatabase(passwordChars)
-
-                    // Record unlock timestamp for auto-lock timeout
-                    preferencesManager.setLastUnlockTimestamp(System.currentTimeMillis())
-
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                    onSuccess()
-                } finally {
-                    // SECURITY CONTROL: Clear password from memory
-                    passwordChars.secureWipe()
-                }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Biometric unlock failed: ${e.message}"
-                )
-            }
-        }
+    fun clearLastMasterPassword() {
+        _uiState.value.lastMasterPassword?.secureWipe()
+        _uiState.value = _uiState.value.copy(lastMasterPassword = null)
     }
 }
 
@@ -185,5 +187,8 @@ data class UnlockUiState(
     val isLoading: Boolean = false,
     val isBiometricAvailable: Boolean = false,
     val shouldShowBiometricPromptOnLaunch: Boolean = false,
-    val error: String? = null
+    val shouldOfferBiometricSetup: Boolean = false,
+    val showBiometricInvalidatedDialog: Boolean = false,
+    val error: String? = null,
+    val lastMasterPassword: CharArray? = null
 )
