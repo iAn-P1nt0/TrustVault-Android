@@ -100,30 +100,43 @@ class BiometricViewModel @Inject constructor(
                 activity = activity,
                 masterPassword = masterPassword,
                 onSuccess = {
-                    // Persist enabled flag on success to satisfy unlock preconditions
+                    // onSuccess runs on main thread from BiometricPrompt callback
+                    // Use viewModelScope to handle suspend functions
                     viewModelScope.launch {
-                        preferencesManager.setBiometricEnabled(true)
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            isBiometricEnabled = true,
-                            showSetupDialog = false,
-                            successMessage = "Biometric unlock enabled successfully"
-                        )
-                        checkBiometricAvailability()
-                        onSuccess()
+                        try {
+                            // Persist enabled flag on success to satisfy unlock preconditions
+                            preferencesManager.setBiometricEnabled(true)
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                isBiometricEnabled = true,
+                                showSetupDialog = false,
+                                successMessage = "Biometric unlock enabled successfully"
+                            )
+                            checkBiometricAvailability()
+                            onSuccess()
+                        } catch (e: Exception) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                errorMessage = "Failed to save settings: ${e.message}"
+                            )
+                        }
                     }
                 },
                 onError = { errorMsg ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = errorMsg
-                    )
+                    viewModelScope.launch {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = errorMsg
+                        )
+                    }
                 },
                 onUserCancelled = {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        showSetupDialog = false
-                    )
+                    viewModelScope.launch {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            showSetupDialog = false
+                        )
+                    }
                 }
             )
         }
@@ -174,36 +187,56 @@ class BiometricViewModel @Inject constructor(
                     activity = activity,
                     masterPassword = masterPassword,
                     onSuccess = {
-                        // Persist enabled flag after successful wrapping
+                        // onSuccess runs on main thread from BiometricPrompt callback
+                        // Use viewModelScope to handle suspend functions
                         viewModelScope.launch {
-                            preferencesManager.setBiometricEnabled(true)
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                isBiometricEnabled = true,
-                                showSetupDialog = false,
-                                successMessage = "Biometric unlock enabled successfully"
-                            )
-                            checkBiometricAvailability()
-                            onSuccess()
+                            try {
+                                // Persist enabled flag after successful wrapping
+                                preferencesManager.setBiometricEnabled(true)
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    isBiometricEnabled = true,
+                                    showSetupDialog = false,
+                                    successMessage = "Biometric unlock enabled successfully"
+                                )
+                                checkBiometricAvailability()
+                                onSuccess()
+                            } catch (e: Exception) {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    errorMessage = "Failed to save settings: ${e.message}"
+                                )
+                            } finally {
+                                // SECURITY: Wipe password after successful setup
+                                masterPassword.secureWipe()
+                            }
                         }
-                        // SECURITY: Wipe password after successful setup
-                        masterPassword.secureWipe()
                     },
                     onError = { errorMsg ->
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            errorMessage = errorMsg
-                        )
-                        // SECURITY: Wipe password on error
-                        masterPassword.secureWipe()
+                        viewModelScope.launch {
+                            try {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    errorMessage = errorMsg
+                                )
+                            } finally {
+                                // SECURITY: Wipe password on error
+                                masterPassword.secureWipe()
+                            }
+                        }
                     },
                     onUserCancelled = {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            showSetupDialog = false
-                        )
-                        // SECURITY: Wipe password on cancellation
-                        masterPassword.secureWipe()
+                        viewModelScope.launch {
+                            try {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    showSetupDialog = false
+                                )
+                            } finally {
+                                // SECURITY: Wipe password on cancellation
+                                masterPassword.secureWipe()
+                            }
+                        }
                     }
                 )
             } catch (e: Exception) {
