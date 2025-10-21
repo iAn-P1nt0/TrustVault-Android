@@ -26,7 +26,8 @@ import com.trustvault.android.presentation.ui.components.BiometricSettingsSectio
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onLockApp: () -> Unit,
-    onNavigateToImportExport: () -> Unit = {}
+    onNavigateToImportExport: () -> Unit = {},
+    onNavigateToPrivacyDashboard: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -103,6 +104,39 @@ fun SettingsScreen(
                     Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Import & Export")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Privacy & Compliance Section
+            Text(
+                "Privacy & Compliance",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Button(
+                    onClick = onNavigateToPrivacyDashboard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(Icons.Filled.PrivacyTip, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Privacy Dashboard (GDPR/DPDP)")
                 }
             }
 

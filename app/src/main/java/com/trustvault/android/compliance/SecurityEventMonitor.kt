@@ -166,7 +166,7 @@ class SecurityEventMonitor @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "monitoring_started",
             resource = "security_monitor",
-            result = AuditLogger.EventResult.SUCCESS
+            result = "success"
         )
     }
 
@@ -188,7 +188,7 @@ class SecurityEventMonitor @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "monitoring_stopped",
             resource = "security_monitor",
-            result = AuditLogger.EventResult.SUCCESS
+            result = "success"
         )
     }
 
@@ -385,7 +385,7 @@ class SecurityEventMonitor @Inject constructor(
             recommendedAction = "Review consent records and halt unauthorized data processing",
             metadata = mapOf(
                 "event_id" to event.id,
-                "resource" to event.resource
+                "resource" to (event.resource ?: "unknown")
             )
         )
     }
@@ -458,13 +458,13 @@ class SecurityEventMonitor @Inject constructor(
             },
             action = "security_alert_raised",
             resource = affectedResource ?: "unknown",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf(
                 "alert_id" to alert.id,
                 "category" to category.name,
                 "title" to title,
                 "description" to description
-            ) + metadata
+            ) + metadata.mapValues { it.value.toString() }
         )
 
         Log.w(TAG, "🚨 SECURITY ALERT [$severity]: $title - $description")
@@ -505,7 +505,7 @@ class SecurityEventMonitor @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "alert_acknowledged",
             resource = "security_monitor",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf("alert_id" to alertId)
         )
 

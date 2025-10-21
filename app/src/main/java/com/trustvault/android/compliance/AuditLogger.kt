@@ -11,7 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -122,13 +124,22 @@ class AuditLogger @Inject constructor(
         PRIVACY_DATA_ERASURE_REQUESTED,
         PRIVACY_DATA_ERASURE_COMPLETED,
         PRIVACY_POLICY_ACCEPTED,
+        PRIVACY_BREACH_NOTIFIED,
+        PRIVACY_DATA_EXPORTED,
 
         // Security events
         SECURITY_THREAT_DETECTED,
         SECURITY_BREACH_DETECTED,
+        SECURITY_BREACH_CONTAINED,
+        SECURITY_BREACH_MITIGATED,
+        SECURITY_BREACH_RESOLVED,
         SECURITY_KEY_ROTATED,
         SECURITY_ENCRYPTION_FAILURE,
         SECURITY_INTEGRITY_VIOLATION,
+        SECURITY_MONITORING_STARTED,
+        SECURITY_MONITORING_STOPPED,
+        SECURITY_ALERT_RAISED,
+        SECURITY_ALERT_ACKNOWLEDGED,
 
         // Configuration events
         CONFIG_SETTING_CHANGED,
@@ -150,6 +161,15 @@ class AuditLogger @Inject constructor(
         WARNING,    // Warning events (potential issues)
         ERROR,      // Error events (failures)
         CRITICAL    // Critical security events (requires immediate attention)
+    }
+
+    /**
+     * Event result status.
+     */
+    enum class EventResult {
+        SUCCESS,    // Operation completed successfully
+        FAILURE,    // Operation failed
+        DENIED      // Operation denied (authorization/permission)
     }
 
     /**
@@ -373,6 +393,49 @@ class AuditLogger @Inject constructor(
         val entryIndex: Int,
         val issue: String
     )
+
+    // ========================================================================
+    // LOG QUERYING
+    // ========================================================================
+
+    /**
+     * Gets audit logs within a specific time range.
+     * Used for forensic analysis and incident investigation.
+     *
+     * @param startTime Start timestamp (inclusive)
+     * @param endTime End timestamp (inclusive)
+     * @return List of audit log entries in the time range
+     */
+    suspend fun getLogsByTimeRange(startTime: Long, endTime: Long): List<AuditLogEntry> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val allEntries = mutableListOf<AuditLogEntry>()
+
+                // Read all log files
+                logDir.listFiles()
+                    ?.filter { it.name.startsWith("audit_") && it.name.endsWith(".log") }
+                    ?.forEach { file ->
+                        val entries = readLogFile(file)
+                        allEntries.addAll(entries)
+                    }
+
+                // Filter by time range and sort
+                allEntries
+                    .filter { it.timestamp in startTime..endTime }
+                    .sortedBy { it.timestamp }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reading logs by time range: ${e.message}", e)
+                emptyList()
+            }
+        }
+    }
+
+    /**
+     * Observes security events in real-time.
+     * Returns a Flow of audit log entries as they occur.
+     */
+    fun observeSecurityEvents(): Flow<AuditLogEntry> = eventStream.filterNotNull()
 
     // ========================================================================
     // LOG ROTATION & RETENTION

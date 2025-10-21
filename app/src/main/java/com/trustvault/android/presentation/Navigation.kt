@@ -22,4 +22,5 @@ sealed class Screen(val route: String) {
     object ImportExport : Screen("import_export")
     object CsvImport : Screen("csv_import")
     object BackupManagement : Screen("backup_management")
+    object PrivacyDashboard : Screen("privacy_dashboard")
 }

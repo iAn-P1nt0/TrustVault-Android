@@ -189,7 +189,7 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.CRITICAL,
             action = "data_breach_reported",
             resource = "data_breach_manager",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf(
                 "breach_id" to breach.id,
                 "severity" to severity.name,
@@ -220,9 +220,9 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "containment_measures_recorded",
             resource = "breach:$breachId",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf(
-                "measures_count" to measures.size,
+                "measures_count" to measures.size.toString(),
                 "measures" to measures.joinToString("; ")
             )
         )
@@ -243,9 +243,9 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "mitigation_actions_recorded",
             resource = "breach:$breachId",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf(
-                "actions_count" to actions.size
+                "actions_count" to actions.size.toString()
             )
         )
     }
@@ -274,7 +274,7 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "breach_notification_sent",
             resource = "breach:$breachId",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf(
                 "notification_timestamp" to formatTimestamp(notificationTime),
                 "dpo_contact" to (dpoContactDetails ?: "not_provided")
@@ -295,7 +295,7 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "breach_contained",
             resource = "breach:$breachId",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf("reason" to reason)
         )
     }
@@ -318,7 +318,7 @@ class DataBreachManager @Inject constructor(
             severity = AuditLogger.EventSeverity.INFO,
             action = "breach_resolved",
             resource = "breach:$breachId",
-            result = AuditLogger.EventResult.SUCCESS,
+            result = "success",
             metadata = mapOf("resolution_timestamp" to formatTimestamp(resolutionTime))
         )
     }

@@ -48,9 +48,9 @@ object ComplianceModule {
     @Singleton
     fun provideAuditLogger(
         @ApplicationContext context: Context,
-        preferencesManager: PreferencesManager
+        cryptoManager: CryptoManager
     ): AuditLogger {
-        return AuditLogger(context, preferencesManager)
+        return AuditLogger(context, cryptoManager)
     }
 
     /**
@@ -62,11 +62,9 @@ object ComplianceModule {
     @Provides
     @Singleton
     fun provideConsentManager(
-        @ApplicationContext context: Context,
-        preferencesManager: PreferencesManager,
-        auditLogger: AuditLogger
+        @ApplicationContext context: Context
     ): ConsentManager {
-        return ConsentManager(context, preferencesManager, auditLogger)
+        return ConsentManager(context)
     }
 
     /**
@@ -159,15 +157,16 @@ object ComplianceModule {
         @ApplicationContext context: Context,
         credentialRepository: CredentialRepository,
         consentManager: ConsentManager,
+        privacyManager: PrivacyManager,
         auditLogger: AuditLogger,
         preferencesManager: PreferencesManager
     ): ComplianceReportGenerator {
         return ComplianceReportGenerator(
             context,
-            credentialRepository,
-            consentManager,
+            privacyManager,
             auditLogger,
-            preferencesManager
+            credentialRepository,
+            consentManager
         )
     }
 

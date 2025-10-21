@@ -182,6 +182,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Screen.Unlock.route) {
                                         popUpTo(Screen.CredentialList.route) { inclusive = true }
                                     }
+                                },
+                                onNavigateToPrivacyDashboard = {
+                                    navController.navigate(Screen.PrivacyDashboard.route)
                                 }
                             )
                         }
@@ -223,6 +226,12 @@ class MainActivity : ComponentActivity() {
                                 onCredentialsExtracted = { ocrResult ->
                                     parentViewModel.populateFromOcrResult(ocrResult)
                                 }
+                            )
+                        }
+
+                        composable(Screen.PrivacyDashboard.route) {
+                            com.trustvault.android.presentation.ui.screens.privacy.PrivacyDashboardScreen(
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
                     }
