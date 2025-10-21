@@ -8,11 +8,14 @@ import com.trustvault.android.security.biometric.BiometricVaultUnlocker
 import com.trustvault.android.security.biometric.EnhancedBiometricAuthManager
 import com.trustvault.android.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.trustvault.android.util.secureWipe
 import javax.inject.Inject
 
 /**
@@ -28,7 +31,8 @@ import javax.inject.Inject
 class BiometricViewModel @Inject constructor(
     private val biometricVaultUnlocker: BiometricVaultUnlocker,
     private val biometricAuthManager: EnhancedBiometricAuthManager,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val passwordHasher: com.trustvault.android.security.PasswordHasher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BiometricUiState())
@@ -58,6 +62,7 @@ class BiometricViewModel @Inject constructor(
     /**
      * Shows the biometric setup dialog.
      */
+    @Suppress("unused") // Public API for UI components
     fun showSetupDialog() {
         _uiState.value = _uiState.value.copy(showSetupDialog = true)
     }
@@ -65,6 +70,7 @@ class BiometricViewModel @Inject constructor(
     /**
      * Hides the biometric setup dialog.
      */
+    @Suppress("unused") // Public API for UI components
     fun hideSetupDialog() {
         _uiState.value = _uiState.value.copy(showSetupDialog = false)
     }
@@ -72,8 +78,14 @@ class BiometricViewModel @Inject constructor(
     /**
      * Sets up biometric unlock with the provided master password.
      *
+     * This variant assumes the master password was already verified (e.g., after a successful
+     * unlock flow) and is being provided from a trusted source (ViewModel state). The provided
+     * CharArray is NOT wiped here; the caller manages lifecycle and wiping.
+     *
+     * Use `setupBiometricUnlockWithVerification()` when getting password from user input.
+     *
      * @param activity FragmentActivity for biometric prompt
-     * @param masterPassword User's master password (will NOT be wiped)
+     * @param masterPassword User's master password (caller manages wiping)
      * @param onSuccess Callback on successful setup
      */
     fun setupBiometricUnlock(
@@ -88,14 +100,18 @@ class BiometricViewModel @Inject constructor(
                 activity = activity,
                 masterPassword = masterPassword,
                 onSuccess = {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isBiometricEnabled = true,
-                        showSetupDialog = false,
-                        successMessage = "Biometric unlock enabled successfully"
-                    )
-                    checkBiometricAvailability()
-                    onSuccess()
+                    // Persist enabled flag on success to satisfy unlock preconditions
+                    viewModelScope.launch {
+                        preferencesManager.setBiometricEnabled(true)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isBiometricEnabled = true,
+                            showSetupDialog = false,
+                            successMessage = "Biometric unlock enabled successfully"
+                        )
+                        checkBiometricAvailability()
+                        onSuccess()
+                    }
                 },
                 onError = { errorMsg ->
                     _uiState.value = _uiState.value.copy(
@@ -110,6 +126,94 @@ class BiometricViewModel @Inject constructor(
                     )
                 }
             )
+        }
+    }
+
+    /**
+     * Sets up biometric unlock with password verification.
+     *
+     * This method verifies the master password before proceeding with biometric setup.
+     * Use this when getting password from user input (e.g., Settings screen).
+     *
+     * @param activity FragmentActivity for biometric prompt
+     * @param masterPassword User's master password (will be verified)
+     * @param onSuccess Callback on successful setup
+     */
+    fun setupBiometricUnlockWithVerification(
+        activity: FragmentActivity,
+        masterPassword: CharArray,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+
+            try {
+                // Step 1: Verify the master password off main thread
+                val storedHash = preferencesManager.masterPasswordHash.first()
+                if (storedHash == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Master password not found. Please set up master password first."
+                    )
+                    return@launch
+                }
+
+                val isValid = withContext(Dispatchers.Default) {
+                    passwordHasher.verifyPassword(masterPassword, storedHash)
+                }
+                if (!isValid) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Incorrect password. Please try again."
+                    )
+                    return@launch
+                }
+
+                // Step 2: Password is valid, proceed with biometric setup
+                biometricVaultUnlocker.setupBiometricUnlock(
+                    activity = activity,
+                    masterPassword = masterPassword,
+                    onSuccess = {
+                        // Persist enabled flag after successful wrapping
+                        viewModelScope.launch {
+                            preferencesManager.setBiometricEnabled(true)
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                isBiometricEnabled = true,
+                                showSetupDialog = false,
+                                successMessage = "Biometric unlock enabled successfully"
+                            )
+                            checkBiometricAvailability()
+                            onSuccess()
+                        }
+                        // SECURITY: Wipe password after successful setup
+                        masterPassword.secureWipe()
+                    },
+                    onError = { errorMsg ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = errorMsg
+                        )
+                        // SECURITY: Wipe password on error
+                        masterPassword.secureWipe()
+                    },
+                    onUserCancelled = {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            showSetupDialog = false
+                        )
+                        // SECURITY: Wipe password on cancellation
+                        masterPassword.secureWipe()
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Password verification failed: ${e.message}"
+                )
+                // SECURITY: Wipe password on exception
+                masterPassword.secureWipe()
+            }
         }
     }
 
@@ -170,4 +274,3 @@ data class BiometricUiState(
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
-

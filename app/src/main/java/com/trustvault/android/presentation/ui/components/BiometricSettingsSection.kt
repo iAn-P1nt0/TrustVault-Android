@@ -176,7 +176,7 @@ fun BiometricSettingsSection(
             onConfirm = { password ->
                 val activity = context as? FragmentActivity
                 if (activity != null) {
-                    viewModel.setupBiometricUnlock(
+                    viewModel.setupBiometricUnlockWithVerification(
                         activity = activity,
                         masterPassword = password.toCharArray(),
                         onSuccess = {

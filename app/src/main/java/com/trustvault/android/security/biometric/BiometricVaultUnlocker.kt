@@ -9,7 +9,6 @@ import com.trustvault.android.util.PreferencesManager
 import com.trustvault.android.util.secureWipe
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
-import javax.crypto.Cipher
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -95,7 +94,7 @@ class BiometricVaultUnlocker @Inject constructor(
      * @param onError Callback with error message
      * @param onUserCancelled Callback when user cancels
      */
-    suspend fun setupBiometricUnlock(
+    fun setupBiometricUnlock(
         activity: FragmentActivity,
         masterPassword: CharArray,
         onSuccess: () -> Unit,
@@ -166,9 +165,8 @@ class BiometricVaultUnlocker @Inject constructor(
                         saveWrappedMEK(wrappedKey)
 
                         // Step 8: Enable biometric unlock preference
-                        kotlinx.coroutines.runBlocking {
-                            preferencesManager.setBiometricEnabled(true)
-                        }
+                        // Moved preference update out of this layer to avoid runBlocking on main thread.
+                        // Caller (e.g., ViewModel) should persist the enabled flag upon success.
 
                         Log.d(TAG, "Biometric unlock setup successful")
                         onSuccess()
